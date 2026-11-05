@@ -385,7 +385,7 @@ const TODAY = new Date(2026, 10, 5);
 const dateBack = days => { const d = new Date(TODAY); d.setDate(d.getDate() - days); return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`; };
 
 let AREA_META = { fetched: '', origin: [178000, 662000] };
-let AREA_IDX = {}, AREA_STREETS = {}, AREA_BY_ZONE = {}, MENTIONS = {}, SEARCH_INDEX = [], NADLAN = null;
+let AREA_IDX = {}, AREA_STREETS = {}, AREA_BY_ZONE = {}, MENTIONS = {}, SEARCH_INDEX = [], NADLAN = null, CTX = null;
 const ZONE_META = {
   '3': { label: 'רובע 3', hood: 'הצפון הישן', mkt: 63000 },
   '4': { label: 'רובע 4', hood: 'הצפון הישן · מזרח', mkt: 60000 },
@@ -395,6 +395,32 @@ const ZONE_META = {
 const STREET_MKT = { 'אחד העם': 58500, 'רוטשילד': 72000, "המלך ג'ורג'": 60500, 'סוקולוב': 63000, 'דיזנגוף': 66000, 'אבן גבירול': 61000 };
 const STREET_EN = { 'אחד העם': ["ahad ha'am", 'ahad haam'], 'רוטשילד': ['rothschild', 'שדרות רוטשילד'], "המלך ג'ורג'": ['king george'], 'סוקולוב': ['sokolov'], 'דיזנגוף': ['dizengoff'], 'אבן גבירול': ['ibn gabirol'], 'בן יהודה': ['ben yehuda'], 'ארלוזורוב': ['arlozorov'], 'פנקס': ['pinkas'] };
 const MAIN = { '3': ['דיזנגוף', 'בן יהודה'], '4': ['נמיר', 'דרך נמיר', 'פנקס', "ז'בוטינסקי", 'ויצמן'], '5-6': ["המלך ג'ורג'"], 'ig': ['אבן גבירול'] };
+/* Transit lines: status as of the data date. Light-rail stations come from the city GIS; for the metro only the route is published (no stations). */
+const TRANSIT = {
+  'אדום': { label: 'הקו האדום', color: '#DC2626', kind: 'רכבת קלה', state: 'live', status: 'פועל מאוגוסט 2023' },
+  'סגול': { label: 'הקו הסגול', color: '#7C3AED', kind: 'רכבת קלה', state: 'build', status: 'בביצוע · פתיחה מתוכננת 2028' },
+  'ירוק': { label: 'הקו הירוק', color: '#16A34A', kind: 'רכבת קלה', state: 'build', status: 'בביצוע · דרום עד לוינסקי 2028, צפון 2030 (מתוכנן)' },
+  'M1': { label: 'מטרו M1', color: '#0EA5E9', kind: 'מטרו', state: 'plan', status: 'תמ״א 70 אושרה בממשלה (5.2025) · הקמה טרם החלה · יעד לקטע ראשון 2037' },
+  'M2': { label: 'מטרו M2', color: '#0369A1', kind: 'מטרו', state: 'plan', status: 'תמ״א 70 אושרה בממשלה (5.2025) · הקמה טרם החלה · יעד לקטע ראשון 2037' },
+  'M3': { label: 'מטרו M3', color: '#1E3A8A', kind: 'מטרו', state: 'plan', status: 'תמ״א 70 אושרה בממשלה (5.2025) · הקמה טרם החלה · יעד לקטע ראשון 2037' }
+};
+const NOISE = { 1: 'עד 55 dB', 2: '55–60 dB', 3: '60–65 dB', 4: '65–70 dB', 5: '70–75 dB', 6: 'מעל 75 dB' };
+function ctxOf(R) {
+  if (!R || !CTX || !CTX.p) return null;
+  const c = CTX.p[`${R.g}-${R.c}`]; if (!c) return null;
+  const N = i => (typeof i === 'number' ? CTX.N[i] : i) || '';
+  const o = { bus: c.bus || 0, nz: c.nz || null, ws: c.ws != null ? c.ws : null };
+  o.lr = (c.lr || []).map(([l, st, d, t]) => ({ line: N(l), station: N(st), d, under: N(t) === 'תחתית' }));
+  o.m = (c.m || []).map(([l, d]) => ({ line: N(l), d }));
+  if (c.bl) o.bl = { d: c.bl[0], street: N(c.bl[1]) };
+  for (const k of ['kg', 'sc', 'hs']) if (c[k]) o[k] = { d: c[k][0], name: N(c[k][1]), stream: N(c[k][2]) };
+  if (c.pk) o.pk = { d: c.pk[0], name: N(c.pk[1]), area: c.pk[2] };
+  if (c.pz) o.pz = { zone: N(c.pz[0]), live: !!c.pz[1], planned: !!c.pz[2] };
+  const fut = [...o.lr.filter(x => TRANSIT[x.line] && TRANSIT[x.line].state === 'build' && x.d <= 500).map(x => ({ ...x, metro: false })),
+               ...o.m.filter(x => x.d <= 400).map(x => ({ ...x, metro: true }))];
+  o.future = fut.sort((a, b) => a.d - b.d);
+  return o;
+}
 const modeOf = arr => { const c = {}; arr.forEach(x => { c[x] = (c[x] || 0) + 1; }); return Object.entries(c).sort((a, b) => b[1] - a[1])[0][0]; };
 const realRec = (sid, n) => (AREA_IDX[sid] || {})[n] || null;
 async function loadData() {
@@ -409,6 +435,7 @@ async function loadData() {
   });
   try { MENTIONS = await (await fetch('mentions.json')).json(); } catch (e) { MENTIONS = {}; }
   try { NADLAN = await (await fetch('nadlan.json')).json(); } catch (e) { NADLAN = null; }
+  try { CTX = await (await fetch('context.json')).json(); } catch (e) { CTX = null; }
   const zones = Object.entries(AREA_BY_ZONE).map(([z, arr]) => ({ type: 'area', id: z, he: `סריקת ${ZONE_META[z].label}`, sub: `${arr.length.toLocaleString('en-US')} חלקות · המובילות`, aliases: [ZONE_META[z].label, ZONE_META[z].hood, 'רובע ' + z, 'סריקה'] }));
   const streets = Object.entries(AREA_STREETS).map(([st, arr]) => ({ type: 'street', id: st, he: st, sub: `${ZONE_META[modeOf(arr.map(r => r.area))].label} · ${arr.length} חלקות`, aliases: [st, ...(STREET_EN[st] || [])], n: arr.length })).sort((x, y) => y.n - x.n);
   SEARCH_INDEX = [...zones, ...streets];
@@ -648,7 +675,7 @@ function genParcel(streetId, num, idx, total, ov) {
     status, route, preservation, developer, architect, signedUnits, estate, roofAttached, condoRegistered, mortgages, lien,
     hasListing, listing, unitSqm, listPrice, listPpsqm, discount, marketValue, postApproval, postBuild, newSqm, newPpsqm, years,
     basis, upliftApproval, cagr, mkt: S.mkt, score, highConviction, unitList, plans, events, ai, real: !!R, poly: R ? R.poly : null,
-    mentions: MN.length, ownReal: !!own, ownTypes, nonPrivate, verifiedAdd: calc.verified != null ? calc.verified - built : null, rangeLo: calc.range.lo - built, rangeHi: calc.range.hi - built
+    ctx: ctxOf(R), mentions: MN.length, ownReal: !!own, ownTypes, nonPrivate, verifiedAdd: calc.verified != null ? calc.verified - built : null, rangeLo: calc.range.lo - built, rangeHi: calc.range.hi - built
   };
 }
 
@@ -703,7 +730,8 @@ const PATHS = {
   key: <><circle cx="7.5" cy="15.5" r="4.5" /><path d="m10.7 12.3 9.3-9.3M17 6l3 3M14 9l2 2" /></>,
   user: <><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></>,
   scale: <><path d="M12 3v18M7 21h10M5 7h14M5 7l-3 7a3.5 3.5 0 0 0 6 0zM19 7l-3 7a3.5 3.5 0 0 0 6 0z" /></>,
-  pin: <><path d="M12 22s7-6.2 7-12a7 7 0 1 0-14 0c0 5.8 7 12 7 12z" /><circle cx="12" cy="10" r="2.5" /></>
+  pin: <><path d="M12 22s7-6.2 7-12a7 7 0 1 0-14 0c0 5.8 7 12 7 12z" /><circle cx="12" cy="10" r="2.5" /></>,
+  train: <><rect x="5" y="3" width="14" height="14" rx="3" /><path d="M5 11h14M9 21l-2 0M8 17l-2 4M16 17l2 4" /><circle cx="9" cy="14" r=".6" /><circle cx="15" cy="14" r=".6" /></>
 };
 const Icon = ({ name, className = 'w-4 h-4', stroke = 1.8 }) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">{PATHS[name]}</svg>
@@ -714,6 +742,14 @@ const Icon = ({ name, className = 'w-4 h-4', stroke = 1.8 }) => (
    4b. INFO TIPS
    ========================================================================= */
 const INFO = {
+  ctx: 'מה יש סביב הבניין היום ומה מתוכנן: רכבת קלה, מטרו, אוטובוסים, חינוך, פארקים, רעש ותקן חניה. נשלף מה-GIS של העירייה ונמדד מגבול החלקה. זה מידע בלבד: לא משנה את הציון ולא את הרווח. מה שכבר קיים (אוטובוסים, בתי ספר, גינות) כבר מגולם במחיר השכונתי, ולכן ספירה כפולה הייתה מנפחת את הרווח.',
+  ctx_transit: 'תחנת הרכבת הקלה הקרובה בכל קו, והמרחק מהמטרו. ברכבת הקלה מופיעות תחנות אמיתיות. במטרו העירייה מפרסמת רק את תוואי הקו, בלי מיקום תחנות, ולכן המרחק הוא לתוואי ולא לתחנה. מחירים נוטים לעלות סמוך לפתיחה, לא באישור, ומועדי פתיחה בישראל נדחים לעיתים קרובות.',
+  ctx_future: 'הבניין נמצא עד 500 מ׳ מתחנה של קו רכבת קלה שעוד לא פועל (סגול או ירוק), או עד 400 מ׳ מתוואי מטרו. זה פוטנציאל שעוד לא מגולם במלואו במחיר.',
+  ctx_daily: 'תחנות אוטובוס בטווח 300 מ׳ (הליכה של כ-4 דקות), נת״צ קרוב, גן ילדים, בית ספר יסודי, חטיבה או תיכון ופארק או גינה מעל 2 דונם. נתוני חינוך לשנת תשפ״ז.',
+  ctx_noise: 'רמת הרעש מתחבורה בגובה 4 מ׳ (קומה ראשונה), הגבוהה ביותר שנוגעת בחלקה. רעש מעל 70 dB אופייני לחזית על ציר ראשי: משפיע על מחיר הדירות בחזית ועל דרישות אקוסטיקה (חלונות, ממ״ד).',
+  ctx_parking: 'אזורי תקן החניה סביב הרכבת הקלה בשכבה העירונית: א׳ עד 300 מ׳ מציר המסילה, ב׳ 300–600 מ׳, ג׳ מעבר לזה. לפי מדיניות הוועדה המקומית (תא/מק/9072), כל עוד הקו לא פועל האזור יורד דרגה. למגורים התקן נשאר לפי תכנית ח׳ (עד חניה אחת ליחידה), ולכן החיסכון בבניין מגורים בודד מוגבל, והוא לא נכנס לחישוב הרווח. תקני חניה נמוכים בהרבה (0.3–0.8 ליחידה) קבועים בתמ״א 70, אבל רק לתכניות חדשות סביב תחנות מטרו. השכבה עודכנה לאחרונה ב-2018.',
+  ctx_t70: 'תמ״א 70 (תכנית המטרו) לא נותנת זכויות בנייה. זכויות יגיעו רק מתכנית מפורטת עתידית סביב התחנה, עם רח״ק ממוצע מינימלי לכל התכנית ולא לכל מגרש. עד אז היא מגבילה (סעיף 5.5): במרחב הליבה (כ-100 מ׳ מכניסות התחנה) אין היתרים לפי תמ״א 38 או תכנית לפי סעיף 23, ובטבעת הראשונה (כ-300 מ׳) צריך אישור של יו״ר המחוזית ומתכנן המחוז. פטורים: היתרי חיזוק בלבד, החלטות לפני 8.11.2022 ואזורי שימור מקומי (כמו כרמלית, כיכר מגן דוד והבימה). תכניות שאושרו לפני תמ״א 70 נשארות בתוקף. בשכבה העירונית מופיע רק תוואי המטרו, בלי תחנות, ולכן הסימון הוא חשד לבדיקה בתשריט ולא קביעה.',
+  ctx_works: 'שטח התארגנות או עבודה של הרכבת הקלה סמוך לחלקה. עבודות כאלה עלולות לעכב היתר וגישה לאתר ולפגוע במכירות בתקופת הבנייה.',
   about: 'כלי לאיתור עסקאות התחדשות עירונית בתל אביב לפני שהשוק מגלה אותן. הוא סורק את כל החלקות הבנויות ברובעים 3–6 ובאבן גבירול, מחשב זכויות לפי התכניות שבתוקף, מסמן מתחרים ופעילות בוועדה, ומעריך רווח יזמי לפי הפרמטרים שלכם.',
   city: 'כרגע רק תל אביב-יפו. כל עיר נוספת דורשת את התכניות והשכבות שלה.',
   search: 'חיפוש רחוב בתחום הסריקה, או בחירה ב״סריקת רובע״ לקבלת כל הרובע מדורג לפי ציון.',
@@ -721,7 +757,7 @@ const INFO = {
   dev: 'עלויות, תמורה לבעלים, מחירי מכירה ורווח מינימלי. מזינים פעם אחת, והם משותפים לכל מי שעורך את הכלי. בלעדיהם אין חישוב רווח.',
   rules: 'כל הכללים שהמנוע משתמש בהם, עם מקור, רמת ודאות וחוזק משפטי. לחיצה על תגית כלל בבוחן הנכס פותחת אותו כאן.',
   pipeline: 'נכסים ששמרתם לבדיקה. הרשימה נשמרת בדפדפן הזה בלבד.',
-  chips: 'מסננים שמצטברים על הטבלה והמפה. זכויות מעל 30%: החלק שעוד לא נבנה מתוך המותר. ללא פרויקט פעיל: בלי היתר התחדשות ובלי בניין חדש. סימן מוקדם: הופיע בוועדה או בתכנית בהכנה. מתחת למחיר השוק: לפי מודעות, וזה נתון הדגמה.',
+  chips: 'מסננים שמצטברים על הטבלה והמפה. זכויות מעל 30%: החלק שעוד לא נבנה מתוך המותר. ללא פרויקט פעיל: בלי היתר התחדשות ובלי בניין חדש. סימן מוקדם: הופיע בוועדה או בתכנית בהכנה. מתחת למחיר השוק: לפי מודעות, וזה נתון הדגמה. ליד תחנה עתידית: עד 500 מ׳ מתחנת קו סגול או ירוק, או עד 400 מ׳ מתוואי מטרו.',
   map: 'גבולות החלקות האמיתיים מה-GIS העירוני, מסובבים לאורך הרחוב. הצבע לפי סטטוס, ונקודה כתומה מסמנת מבנה לשימור. לחיצה על חלקה פותחת אותה בבוחן.',
   legend: 'יעד נקי: אין היתר ואין בקשה. סימן מוקדם: הופיע בפרוטוקול ועדה או בתכנית בהכנה, בלי היתר. בקשה פתוחה: בקשה להיתר בתהליך. פרויקט פעיל: היתר התחדשות מ-2018 או בניין שנבנה מ-2008, ולכן לדלג.',
   density: 'סיכום של כל החלקות בסריקה הנוכחית, לא רק של אלה שמוצגות בטבלה.',
@@ -886,7 +922,8 @@ const QUICK_FILTERS = [
   { id: 'rights30', label: 'זכויות לא ממומשות > 30%', test: p => p.unusedRatio > 0.30 },
   { id: 'noDev', label: 'ללא פרויקט פעיל', test: p => p.status !== 'signed' },
   { id: 'protocol', label: 'סימן מוקדם בוועדה', test: p => p.status === 'protocol' },
-  { id: 'under', label: 'מודעה מתחת למחיר השוק', test: p => p.hasListing && p.discount >= 0.08 }
+  { id: 'under', label: 'מודעה מתחת למחיר השוק', test: p => p.hasListing && p.discount >= 0.08 },
+  { id: 'transit', label: 'ליד תחנה עתידית', test: p => !!(p.ctx && p.ctx.future.length) }
 ];
 
 
@@ -1557,6 +1594,7 @@ function OpportunityTable({ onOpenDev, compact, rows, sort, setSort, selectedId,
                 <td className="px-2.5 py-2 align-middle">
                   <div className={`font-bold text-[13px] ${skip ? 'text-ink-3 line-through decoration-ink-4/60' : 'text-ink'}`}>{p.address}</div>
                   <div className="text-2xs text-ink-3">גוש <Num>{p.gush}</Num> · חלקה <Num>{p.chelka}</Num> · <Num>{p.year}</Num> · ק+<Num>{p.floors - 1}</Num> · <Num>{p.units}</Num> יח״ד</div>
+                  {p.ctx && p.ctx.future.length > 0 && <div className="mt-0.5 inline-flex items-center gap-1 text-2xs font-semibold px-1 rounded" style={{ color: TRANSIT[p.ctx.future[0].line].color, background: TRANSIT[p.ctx.future[0].line].color + '14' }}><Icon name="train" className="w-3 h-3" />{TRANSIT[p.ctx.future[0].line].label} · <Num>{fmtM(p.ctx.future[0].d)}</Num></div>}
                 </td>
                 <td className="px-2.5 py-2 align-middle"><div className="flex flex-col items-start gap-1"><StatusBadge status={p.status} size="sm" /><RouteChip route={p.route} preservation={p.preservation} /></div></td>
                 <td className="px-2.5 py-2 align-middle whitespace-nowrap">
@@ -1932,6 +1970,7 @@ function AboutModal({ onClose, onOpenDev }) {
             'מסמן מתחרים: בניינים עם היתר, בקשה פעילה או בנייה חדשה עוברים לרשימת הדילוג.',
             'מזהה סימנים מוקדמים: בניין שמופיע בפרוטוקולי הוועדה המקומית או בתכנית בהכנה, לפני שיש לו היתר.',
             'מוסיף בעלות: כמה בעלים צריך להחתים, ואם הבעלות פרטית או של המדינה.',
+            'מציג את הסביבה: מרחק לרכבת הקלה ולמטרו (כולל קווים שעוד בבנייה), אוטובוסים, גנים ובתי ספר, פארקים, רעש ותקן חניה.',
             'מחשב רווח יזמי לכל בניין לפי הפרמטרים שלכם, ומדרג את כולם.'
           ])}
         </section>
@@ -1943,6 +1982,7 @@ function AboutModal({ onClose, onOpenDev }) {
             'לחסוך שעות של בדיקה: חישוב הזכויות מוכן, עם הפניה לסעיף ולמסמך.',
             'לתעדף לפי כסף: רווח יזמי, מספר בעלים להחתמה וסוג בעלות, במקום תחושת בטן.',
             'לא לבזבז זמן על בניינים תפוסים: היתרים ופרויקטים פעילים מסומנים מראש.',
+            'לזהות מיקום שעוד לא מתומחר: בניינים ליד תחנות של הקו הסגול, הירוק או המטרו, לפני שהקו נפתח.',
             'לגלות זכויות שקל לפספס: שחזור מרתף, בונוס גג, סף 500 מ״ר ואיחוד חלקות.'
           ], '#10B981')}
         </section>
@@ -2077,6 +2117,67 @@ function PpsqmChart({ p }) {
   );
 }
 
+const fmtM = d => d < 1000 ? `${d} מ׳` : `${(d / 1000).toFixed(1)} ק״מ`;
+function CtxSection({ p }) {
+  const c = p.ctx;
+  if (!c) return null;
+  const Row = ({ label, value, sub, tone = 'text-ink' }) => (
+    <div className="flex items-start justify-between gap-2 py-1.5">
+      <span className="text-2xs text-ink-3 shrink-0">{label}</span>
+      <span className="text-end min-w-0"><span className={`text-[12.5px] font-semibold ${tone}`}>{value}</span>{sub && <span className="block text-2xs text-ink-3 truncate">{sub}</span>}</span>
+    </div>
+  );
+  const transit = [...c.lr.map(x => ({ key: x.line, name: `תחנת ${x.station}${x.under ? ' (תת-קרקעית)' : ''}`, d: x.d })), ...c.m.map(x => ({ key: x.line, name: 'תוואי הקו (תחנות לא פורסמו)', d: x.d }))]
+    .filter(x => TRANSIT[x.key]).sort((a, b) => a.d - b.d);
+  return (
+    <Section info="ctx" eyebrow="סביבה ותשתיות" title="מה יש ליד הבניין, ומה מתוכנן" icon="pin">
+      <div className="mb-2 text-2xs rounded-md bg-canvas border border-line text-ink-2 px-2 py-1">נתון אמיתי מה-GIS העירוני. מידע בלבד: לא משנה את הציון ולא את הרווח.</div>
+      {c.future.length > 0 && (
+        <div className="mb-2.5 rounded-lg bg-go-soft text-go-ink px-2.5 py-2 text-[12.5px] leading-snug flex gap-2">
+          <Icon name="train" className="w-4 h-4 shrink-0 mt-px" />
+          <span><b>תשתית עתידית בהליכה:</b> {c.future.slice(0, 2).map(f => `${TRANSIT[f.line].label} (${f.metro ? 'תוואי' : 'תחנת ' + f.station}, ${fmtM(f.d)})`).join(' · ')}. <Info k="ctx_future" /></span>
+        </div>
+      )}
+      {c.ws != null && (
+        <div className="mb-2.5 rounded-lg bg-act-soft text-act-ink px-2.5 py-2 text-[12.5px] leading-snug flex gap-2">
+          <Icon name="alert" className="w-4 h-4 shrink-0 mt-px" /><span>שטח עבודות של הרכבת הקלה במרחק {fmtM(c.ws)}. <Info k="ctx_works" /></span>
+        </div>
+      )}
+      {c.m.some(x => x.d <= 300) && (
+        <div className="mb-2.5 rounded-lg bg-pre-soft text-pre-ink px-2.5 py-2 text-[12.5px] leading-snug flex gap-2">
+          <Icon name="alert" className="w-4 h-4 shrink-0 mt-px" /><span>עד 300 מ׳ מתוואי מטרו. אם יש תחנה קרובה, תמ״א 70 עשויה להגביל היתרים (סעיף 5.5) ובעתיד לאפשר ציפוף דרך תכנית מתחם. בדקו מיקום תחנה בתשריט. <Info k="ctx_t70" /></span>
+        </div>
+      )}
+      <div className="eyebrow flex items-center gap-1 mb-1">רכבת קלה ומטרו <Info k="ctx_transit" /></div>
+      <div className="border border-line rounded-lg divide-y divide-line-soft mb-3">
+        {transit.length ? transit.map((x, i) => {
+          const T = TRANSIT[x.key];
+          return (
+            <div key={i} className="flex items-center gap-2 px-2.5 py-1.5">
+              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: T.color }} />
+              <div className="min-w-0 flex-1">
+                <div className="text-[12.5px] font-semibold text-ink truncate">{T.label} · <span className="font-normal text-ink-2">{x.name}</span></div>
+                <div className={`text-2xs ${T.state === 'live' ? 'text-go-ink' : T.state === 'build' ? 'text-pre-ink' : 'text-ink-3'}`}>{T.status}</div>
+              </div>
+              <Num className={`text-[12.5px] font-bold ${x.d <= 500 ? 'text-ink' : 'text-ink-3'}`}>{fmtM(x.d)}</Num>
+            </div>
+          );
+        }) : <div className="px-2.5 py-2 text-2xs text-ink-3">אין קו במרחק 1.5 ק״מ.</div>}
+      </div>
+      <div className="eyebrow flex items-center gap-1 mb-0.5">יום-יום <Info k="ctx_daily" /></div>
+      <div className="divide-y divide-line-soft">
+        <Row label="תחנות אוטובוס עד 300 מ׳" value={<Num>{c.bus}</Num>} sub={c.bl ? `נת״צ ברחוב ${c.bl.street} (${fmtM(c.bl.d)})` : 'אין נת״צ ב-150 מ׳'} />
+        <Row label="גן ילדים קרוב" value={c.kg ? fmtM(c.kg.d) : 'מעל 1 ק״מ'} sub={c.kg && `${c.kg.name}${c.kg.stream ? ' · ' + c.kg.stream : ''}`} />
+        <Row label="בית ספר יסודי" value={c.sc ? fmtM(c.sc.d) : 'מעל 1.5 ק״מ'} sub={c.sc && `${c.sc.name}${c.sc.stream ? ' · ' + c.sc.stream : ''}`} />
+        <Row label="חטיבה / תיכון" value={c.hs ? fmtM(c.hs.d) : 'מעל 2 ק״מ'} sub={c.hs && `${c.hs.name}${c.hs.stream ? ' · ' + c.hs.stream : ''}`} />
+        <Row label="פארק או גינה (2 דונם+)" value={c.pk ? fmtM(c.pk.d) : 'מעל 1 ק״מ'} sub={c.pk && `${c.pk.name || 'גינה'} · ${n0(c.pk.area)} מ״ר`} />
+        <Row label={<span className="inline-flex items-center gap-1">רעש תחבורה בחזית <Info k="ctx_noise" /></span>} value={c.nz ? NOISE[c.nz] : '—'} tone={c.nz >= 5 ? 'text-stop' : c.nz >= 4 ? 'text-act-ink' : 'text-go-ink'} sub={c.nz >= 5 ? 'חזית רועשת: מחיר נמוך יותר בדירות לרחוב' : c.nz <= 2 ? 'שקט' : ''} />
+        <Row label={<span className="inline-flex items-center gap-1">אזור תקן חניה (רכבת קלה) <Info k="ctx_parking" /></span>} value={c.pz ? `אזור ${c.pz.zone}׳` : '—'} sub={c.pz ? (c.pz.zone === 'א' ? 'עד 300 מ׳ מציר רכבת' : c.pz.zone === 'ב' ? '300–600 מ׳ מציר רכבת' : 'רחוק מציר רכבת') : ''} />
+      </div>
+    </Section>
+  );
+}
+
 function Inspector({ onOpenDev, p, onClose, onExport, onSave, saved, onContact, overlay, onOverride, onReset, openRule }) {
   const st = STATUS[p.status];
   const legalSigned = p.unitList.filter(u => u.notes.includes('warn126')).length;
@@ -2124,6 +2225,8 @@ function Inspector({ onOpenDev, p, onClose, onExport, onSave, saved, onContact, 
         <RightsCalculator p={p} onOverride={onOverride} onReset={onReset} openRule={openRule} />
 
         <EconSection p={p} onOpenDev={onOpenDev} />
+
+        <CtxSection p={p} />
 
         <Section info="tabu" eyebrow="טאבו" title="בדיקה משפטית וחלק בקרקע" icon="key">
           <div className="mb-2 text-2xs rounded-md bg-act-soft text-act-ink px-2 py-1">מספר תתי-החלקות, רישום הבית המשותף וסוג הבעלות: פנקסי המקרקעין (data.gov.il), נתון אמיתי. הערות אזהרה, משכנתאות ושמות בעלים דורשים נסח טאבו (לא נשלף), ולכן שאר הסעיף הוא הדגמה.</div>
