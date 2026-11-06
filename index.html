@@ -397,7 +397,7 @@ const TODAY = new Date(2026, 10, 5);
 const dateBack = days => { const d = new Date(TODAY); d.setDate(d.getDate() - days); return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`; };
 
 let AREA_META = { fetched: '', origin: [178000, 662000] };
-let AREA_IDX = {}, AREA_STREETS = {}, AREA_BY_ZONE = {}, MENTIONS = {}, SEARCH_INDEX = [], NADLAN = null, CTX = null;
+let AREA_IDX = {}, AREA_STREETS = {}, AREA_BY_ZONE = {}, MENTIONS = {}, SEARCH_INDEX = [], NADLAN = null, CTX = null, LISTINGS = {};
 const ZONE_META = {
   '3': { label: 'רובע 3', hood: 'הצפון הישן', mkt: 63000 },
   '4': { label: 'רובע 4', hood: 'הצפון הישן · מזרח', mkt: 60000 },
@@ -565,7 +565,7 @@ function genParcel(streetId, num, idx, total, ov) {
   const signedUnits = Math.round(units * u(13, sigRange[0], sigRange[1]));
   const developer = R ? null : status === 'signed' || (status === 'file' && D[15] < 0.6) ? pick(14, DEVS) : null;
   const architect = status === 'file' || status === 'protocol' ? pick(16, ARCHS) : null;
-  const estate = D[17] < 0.16;
+  const estate = !R && D[17] < 0.16; // unknown for real parcels until a nesach is loaded
   const roofAttached = D[18] < 0.38;
   const condoRegistered = own ? own.u > 0 : D[19] < 0.86;
   const ownTypes = own ? Object.keys(own.t) : [];
@@ -576,37 +576,24 @@ function genParcel(streetId, num, idx, total, ov) {
   const gush = R ? R.g : S.gush[Math.min(S.gush.length - 1, Math.floor(idx / total * S.gush.length))];
   const chelka = R ? R.c : ui(22, 12, 214);
 
-  // Market
-  const hasListing = D[23] < (status === 'signed' ? 0.5 : 0.74);
-  const unitSqm = ui(24, 52, 104);
-  const fRange = { clean: [0.78, 1.04], protocol: [0.8, 1.03], file: [0.9, 1.07], signed: [1.0, 1.14] }[status];
-  const factor = u(25, fRange[0], fRange[1]);
-  const listPrice = Math.round(unitSqm * S.mkt * factor / 10000) * 10000;
-  const listPpsqm = listPrice / unitSqm;
-  const discount = 1 - listPpsqm / S.mkt;
-  const marketValue = unitSqm * S.mkt;
-  const upl = unused > 0 ? RT.uplift : 1.0;
-  const postApproval = Math.round(unitSqm * S.mkt * upl / 10000) * 10000;
-  const addSqm = unused <= 0 ? 0 : route === 'preservation' ? ui(26, 0, 6) : ui(26, 12, 20);
-  const newSqm = unitSqm + addSqm;
-  const newPpsqm = S.mkt * (unused > 0 ? u(27, 1.32, 1.42) : 1.05);
-  const postBuild = Math.round(newSqm * newPpsqm / 10000) * 10000;
-  const years = { clean: 7, protocol: 6, file: 4.5, signed: 3.5 }[status] + (calc.pend ? 1 : 0);
-  const basis = hasListing ? listPrice : marketValue;
-  const upliftApproval = postApproval / basis - 1;
-  const cagr = Math.pow(postBuild / basis, 1 / years) - 1;
-
-  const listing = hasListing ? {
-    source: pick(28, ['יד2', 'מדלן']), floor: 1 + Math.floor(D[29] * resFloors), rooms: unitSqm < 62 ? 2.5 : unitSqm < 82 ? 3 : 4,
-    sqm: unitSqm, price: listPrice, ppsqm: listPpsqm, dom: ui(30, 3, 140), seller: estate && D[31] < 0.6 ? 'יורשים' : pick(32, ['פרטי', 'פרטי', 'מתווך'])
-  } : null;
+  // Market: only listings a user entered (no demo listings). Reference = average deal price in the neighborhood for the same room count (nadlan.gov.il).
+  const LS = R ? LISTINGS[`${R.g}-${R.c}`] || null : null;
+  const nbRef = nadlanRef({ inputs: inp, street: S.he });
+  const roomKey = r => r >= 4.5 ? '5' : r >= 3.5 ? '4' : r >= 2.75 ? '3' : null;
+  const refRow = LS && nbRef && roomKey(+LS.rooms) ? nbRef.rooms[roomKey(+LS.rooms)] : null;
+  const refPrice = refRow ? (refRow.yearAvg || refRow.last) : null;
+  const hasListing = !!LS;
+  const listing = LS ? { ...LS, ppsqm: LS.sqm ? LS.price / LS.sqm : null, ref: refPrice, refWhen: refRow ? refRow.when : null, refNb: nbRef ? nbRef.name : null, refExact: nbRef ? nbRef.exact : false } : null;
+  const discount = listing && refPrice ? 1 - listing.price / refPrice : null;
+  const unitSqm = LS ? +LS.sqm || null : null, listPrice = LS ? +LS.price : null, listPpsqm = listing ? listing.ppsqm : null;
+  const marketValue = null, postApproval = null, postBuild = null, newSqm = null, newPpsqm = null, years = null, basis = null, upliftApproval = null, cagr = null;
 
   // Score
   let s = Math.min(1, unusedRatio / 0.5) * 38;
   s += { clean: 30, protocol: 34, file: 14, signed: 0 }[status];
-  if (hasListing) s += Math.max(0, Math.min(1, discount / 0.15)) * 18;
+  if (discount != null) s += Math.max(0, Math.min(1, discount / 0.15)) * 18;
   if (estate) s += 5;
-  if (!roofAttached) s += 3;
+  if (!R && !roofAttached) s += 3;
   if (preservation) s -= 14;
   if (calc.pend) s -= 4;
   if (calc.best && calc.best.conf === 'low') s -= 4;
@@ -767,11 +754,11 @@ const INFO = {
   about: 'כלי לאיתור עסקאות התחדשות עירונית בתל אביב לפני שהשוק מגלה אותן. הוא סורק את כל החלקות הבנויות ברובעים 3–6 ובאבן גבירול, מחשב זכויות לפי התכניות שבתוקף, מסמן מתחרים ופעילות בוועדה, ומעריך רווח יזמי לפי הפרמטרים שלכם.',
   city: 'כרגע רק תל אביב-יפו. כל עיר נוספת דורשת את התכניות והשכבות שלה.',
   search: 'חיפוש רחוב בתחום הסריקה, או בחירה ב״סריקת רובע״ לקבלת כל הרובע מדורג לפי ציון.',
-  datapill: 'אמיתי: חלקות, מבנים, שימור, היתרים, תכניות, פרוטוקולים, בעלות ומחירי ייחוס לשכונה. הדגמה: מחירי מודעות ופרטי נסח טאבו (הערות אזהרה, משכנתאות, שמות).',
+  datapill: 'אמיתי: חלקות, מבנים, שימור, היתרים, תכניות, פרוטוקולים, בעלות ומחירי ייחוס לשכונה. מודעות: רק מה שאתם מזינים. הדגמה: פרטי נסח טאבו לכל דירה (הערות אזהרה, משכנתאות, שמות).',
   dev: 'עלויות, תמורה לבעלים, מחירי מכירה ורווח מינימלי. מזינים פעם אחת, והם משותפים לכל מי שעורך את הכלי. בלעדיהם אין חישוב רווח.',
   rules: 'כל הכללים שהמנוע משתמש בהם, עם מקור, רמת ודאות וחוזק משפטי. לחיצה על תגית כלל בבוחן הנכס פותחת אותו כאן.',
   pipeline: 'נכסים ששמרתם לבדיקה. הרשימה נשמרת בדפדפן הזה בלבד.',
-  chips: 'מסננים שמצטברים על הטבלה והמפה. זכויות מעל 30%: החלק שעוד לא נבנה מתוך המותר. ללא פרויקט פעיל: בלי היתר התחדשות ובלי בניין חדש. סימן מוקדם: הופיע בוועדה או בתכנית בהכנה. מתחת למחיר השוק: לפי מודעות, וזה נתון הדגמה. צמוד לתחנה עתידית: עד 200 מ׳ מתחנה של הקו הסגול או הירוק. ברובעים 3–6 כ-91% מהחלקות נמצאות עד 500 מ׳ מתחנה עתידית, ולכן רק צמידות ממש מבדלת.',
+  chips: 'מסננים שמצטברים על הטבלה והמפה. זכויות מעל 30%: החלק שעוד לא נבנה מתוך המותר. ללא פרויקט פעיל: בלי היתר התחדשות ובלי בניין חדש. סימן מוקדם: הופיע בוועדה או בתכנית בהכנה. מודעה מתחת לשכונה: מודעה שהזנתם, 8% ומעלה מתחת לממוצע העסקאות בשכונה. צמוד לתחנה עתידית: עד 200 מ׳ מתחנה של הקו הסגול או הירוק. ברובעים 3–6 כ-91% מהחלקות נמצאות עד 500 מ׳ מתחנה עתידית, ולכן רק צמידות ממש מבדלת.',
   map: 'גבולות החלקות האמיתיים מה-GIS העירוני, מסובבים לאורך הרחוב. הצבע לפי סטטוס, ונקודה כתומה מסמנת מבנה לשימור. לחיצה על חלקה פותחת אותה בבוחן.',
   legend: 'יעד נקי: אין היתר ואין בקשה. סימן מוקדם: הופיע בפרוטוקול ועדה או בתכנית בהכנה, בלי היתר. בקשה פתוחה: בקשה להיתר בתהליך. פרויקט פעיל: היתר התחדשות מ-2018 או בניין שנבנה מ-2008, ולכן לדלג.',
   density: 'סיכום של כל החלקות בסריקה הנוכחית, לא רק של אלה שמוצגות בטבלה.',
@@ -793,7 +780,7 @@ const INFO = {
   col_profit: 'רווח יזמי במסלול הכי רווחי, בשקלים ובאחוז מסך העלויות, לפי הפרמטרים היזמיים. ירוק: עובר את הרווח המינימלי שהגדרתם. אדום: לא עובר.',
   insp: 'ניתוח של הבניין כולו, לא של דירה בודדת: זכויות, כלכלה, בעלות, סביבה ופעילות תכנונית. אפשר לערוך את שדות הקלט, והחישוב מתעדכן.',
   k_verified: 'תוספת שטח מוקנית לפי תכנית בתוקף, והטווח עד מה שאפשר עם הקלות ושיקול דעת.',
-  k_uplift: 'מבוסס על מחיר מודעה, שהוא נתון הדגמה. לא להסתמך עליו עד שיחובר מקור מחירים אמיתי.',
+  k_uplift: 'כמה המודעה שהזנתם זולה או יקרה ממחיר העסקאות הממוצע בשכונה לדירה עם אותו מספר חדרים (נדל״ן.gov.il). מופיע רק אחרי שמזינים מודעה.',
   k_profit: 'רווח יזמי במסלול הכי רווחי, לפי הפרמטרים שהוזנו. הפירוט בסעיף ״כלכלה יזמית״.',
   calc: 'החישוב בשכבות: תקרת תא/5000, התכנית המפורטת שנותנת את הזכויות, הנחיות עיצוב שמקטינות את השטח בפועל, ממצאים ״בין השורות״ ומסלולים חלופיים.',
   inputs: 'נתוני הבניין שהחישוב משתמש בהם. ״GIS״ בכחול פירושו שהנתון נשלף מהעירייה. אפשר לתקן לפי תיק הבניין, והחישוב יתעדכן. התיקון נשמר רק אצלך.',
@@ -806,7 +793,7 @@ const INFO = {
   econ: 'רווח יזמי לפי הפרמטרים שהזנתם, לכל מסלול: הכנסות ממכירה פחות בנייה, רכות ומימון, תמורה לבעלים והיטל. הקרקע לא מתומחרת, כי היא ניתנת בתמורה לדירות.',
   tabu: 'מספר תתי-החלקות, רישום הבית המשותף וסוג הבעלות הם נתונים אמיתיים מפנקסי המקרקעין. הערות אזהרה, משכנתאות, ירושות ושמות דורשים נסח טאבו.',
   plans: 'תכניות שחלות על החלקה, בקשות והיתרי בנייה, ואזכורים בפרוטוקולי הוועדה מ-2025–2026, עם קישור למסמך.',
-  market: 'מודעות ומחירי שוק לדירה בבניין. זה נתון הדגמה, כי אין חיבור ליד2 או למדלן.',
+  market: 'מודעה שראיתם בבניין (ביד2, במדלן או אצל מתווך) מול ממוצע העסקאות בשכונה. אין סריקה אוטומטית של אתרי המודעות, כי תנאי השימוש שלהם אוסרים זאת והם חוסמים. בגרסה ב-Claude המודעות משותפות לכל מי שעורך את הכלי; באתר העצמאי הן נשמרות בדפדפן.',
   in_lotArea: 'שטח המגרש הרשום. קובע את סף 500 מ״ר ואת הרח״ק.',
   in_frontage: 'רוחב חזית המגרש, מחושב מהמלבן החוסם את פוליגון החלקה. משפיע על שטח הקומה בבנייה חדשה.',
   in_floors: 'כולל קומת קרקע או עמודים. ב-GIS קומת הקרקע לא נספרת, ולכן הוספנו אותה.',
@@ -936,7 +923,7 @@ const QUICK_FILTERS = [
   { id: 'rights30', label: 'זכויות לא ממומשות > 30%', test: p => p.unusedRatio > 0.30 },
   { id: 'noDev', label: 'ללא פרויקט פעיל', test: p => p.status !== 'signed' },
   { id: 'protocol', label: 'סימן מוקדם בוועדה', test: p => p.status === 'protocol' },
-  { id: 'under', label: 'מודעה מתחת למחיר השוק', test: p => p.hasListing && p.discount >= 0.08 },
+  { id: 'under', label: 'מודעה מתחת לשכונה', test: p => p.discount != null && p.discount >= 0.08 },
   { id: 'transit', label: 'צמוד לתחנה עתידית', test: p => !!(p.ctx && p.ctx.adj.length) }
 ];
 
@@ -1043,6 +1030,108 @@ function useDevParams() {
     return { ok: true, shared: false };
   };
   return [st, save];
+}
+
+/* Listings the user entered: shared via db collection 'listings' (one doc per block-parcel) when the Claude runtime is present, else browser storage. */
+function useListings() {
+  const [st, setSt] = useState({ map: {}, src: 'loading', v: 0 });
+  const col = useRef(null);
+  const local = () => { try { return JSON.parse(localStorage.getItem('israprop.listings.v1') || '{}') || {}; } catch (e) { return {}; } };
+  const apply = (map, src, note) => { LISTINGS = map; PCACHE.clear(); setSt(s => ({ map, src, note, v: s.v + 1 })); };
+  useEffect(() => {
+    let unsub = null, dead = false;
+    const timer = setTimeout(() => { if (!dead && !col.current) apply(local(), 'local', 'שמירה משותפת לא ענתה. המודעות נשמרות בדפדפן בלבד.'); }, 10000);
+    (async () => {
+      const db = window.claude && window.claude.use ? await window.claude.use('db') : null;
+      if (dead) return;
+      if (!db) { clearTimeout(timer); apply(local(), 'local', 'באתר הזה המודעות נשמרות בדפדפן שלכם בלבד.'); return; }
+      col.current = db.collection('listings');
+      unsub = col.current.onSnapshot(snap => {
+        if (snap.metadata && snap.metadata.fromCache && snap.empty) return;
+        clearTimeout(timer);
+        const map = {}; snap.docs.forEach(d => { if (d.exists) map[d.id] = d.data(); });
+        apply(map, 'db', 'משותף לכל מי שעורך את הכלי.');
+      }, () => { clearTimeout(timer); col.current = null; apply(local(), 'local', 'שמירה משותפת לא זמינה. המודעות נשמרות בדפדפן בלבד.'); });
+    })();
+    return () => { dead = true; clearTimeout(timer); if (unsub) unsub(); };
+  }, []);
+  const write = async (key, data) => {
+    const map = { ...LISTINGS }; if (data) map[key] = data; else delete map[key];
+    try { localStorage.setItem('israprop.listings.v1', JSON.stringify(map)); } catch (e) {}
+    if (col.current) {
+      try { if (data) await col.current.doc(key).set(data); else await col.current.doc(key).delete(); return { ok: true, shared: true }; }
+      catch (e) { apply(map, 'local', 'השמירה המשותפת נכשלה. נשמר בדפדפן בלבד.'); return { ok: true, shared: false }; }
+    }
+    apply(map, 'local', st.note);
+    return { ok: true, shared: false };
+  };
+  return [st, write];
+}
+const ListingCtx = React.createContext({ st: { src: 'local' }, write: async () => ({ ok: false }) });
+
+function ListingForm({ p, onDone }) {
+  const { write } = React.useContext(ListingCtx);
+  const [f, setF] = useState({ price: '', sqm: '', rooms: '', floor: '', url: '' });
+  const [err, setErr] = useState('');
+  const num = v => +String(v).replace(/[^\d.]/g, '');
+  const submit = async e => {
+    e.preventDefault();
+    const price = num(f.price), sqm = num(f.sqm), rooms = num(f.rooms);
+    if (!(price >= 100000) || !(sqm >= 15) || !(rooms >= 1)) { setErr('חובה: מחיר (₪), שטח (מ״ר) ומספר חדרים.'); return; }
+    let url = (f.url || '').trim(); if (url && !/^https?:\/\//.test(url)) url = '';
+    await write(`${p.gush}-${p.chelka}`, { price, sqm, rooms, floor: f.floor === '' ? null : num(f.floor), url, addedAt: new Date().toISOString().slice(0, 10) });
+    onDone && onDone();
+  };
+  const In = ({ k, label, ph, wide }) => (
+    <label className={`grid gap-0.5 ${wide ? 'col-span-2' : ''}`}><span className="text-2xs text-ink-3">{label}</span>
+      <input value={f[k]} onChange={e => setF({ ...f, [k]: e.target.value })} placeholder={ph} dir="ltr" inputMode={k === 'url' ? 'url' : 'decimal'}
+        className="h-8 px-2 rounded-md border border-line bg-white text-[12.5px] text-ink focus:outline-none focus:ring-2 focus:ring-accent/40" /></label>
+  );
+  return (
+    <form onSubmit={submit} className="rounded-lg border border-dashed border-line p-2.5 grid grid-cols-2 gap-2">
+      <div className="col-span-2 text-[12px] text-ink-2">ראיתם מודעה בבניין הזה? הזינו אותה, והכלי ישווה למחיר העסקאות בשכונה.</div>
+      {In({ k: 'price', label: 'מחיר מבוקש (₪)', ph: '3,450,000' })}{In({ k: 'sqm', label: 'שטח (מ״ר)', ph: '78' })}
+      {In({ k: 'rooms', label: 'חדרים', ph: '3' })}{In({ k: 'floor', label: 'קומה', ph: '2' })}
+      {In({ k: 'url', label: 'קישור למודעה (לא חובה)', ph: 'https://…', wide: true })}
+      {err && <div className="col-span-2 text-2xs text-stop">{err}</div>}
+      <div className="col-span-2 flex justify-end"><Btn variant="primary" className="h-8 px-3" type="submit">שמירת מודעה</Btn></div>
+    </form>
+  );
+}
+
+function MarketSection({ p }) {
+  const { st, write } = React.useContext(ListingCtx);
+  const [edit, setEdit] = useState(false);
+  const L = p.listing, nr = nadlanRef(p);
+  return (
+    <Section info="market" eyebrow="מודעה בבניין" title="מחיר מבוקש מול עסקאות בשכונה" icon="scale">
+      <div className="mb-2 text-2xs rounded-md bg-canvas border border-line text-ink-2 px-2 py-1">מודעות שאתם מזינים בלבד. אין סריקה של יד2 או מדלן: תנאי השימוש שלהם אוסרים זאת. {st.note || ''}</div>
+      {L && !edit ? (<>
+        <div className="rounded-lg border border-line p-2.5 flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-[12.5px] font-bold text-ink"><Num>{L.rooms}</Num> חד׳{L.floor != null && <> · קומה <Num>{L.floor}</Num></>} · <Num>{L.sqm}</Num> מ״ר</div>
+            <div className="text-2xs text-ink-3 mt-0.5">הוזן ב-<Num>{L.addedAt}</Num>{L.url && <> · <a href={L.url} target="_blank" rel="noopener noreferrer" className="text-accent font-semibold hover:underline">למודעה ↗</a></>}</div>
+          </div>
+          <div className="text-end shrink-0"><Num className="text-[15px] font-bold text-ink">{ils(L.price)}</Num><div className="text-2xs text-ink-3"><Num>{ilsK(L.ppsqm)}</Num>/מ״ר</div></div>
+        </div>
+        <div className="mt-2 rounded-lg bg-canvas border border-line px-2.5 py-2 text-[12px]">
+          {L.ref ? (<>
+            <div className="flex items-center justify-between gap-2"><span className="text-ink-2">ממוצע עסקאות בשכונה, <Num>{L.rooms >= 4.5 ? 5 : L.rooms >= 3.5 ? 4 : 3}</Num> חד׳</span><Num className="font-bold text-ink">{ils(L.ref)}</Num></div>
+            <div className="flex items-center justify-between gap-2 mt-1"><span className="text-ink-2">פער המודעה</span><Num className={`font-bold ${p.discount > 0.05 ? 'text-go-ink' : p.discount < -0.05 ? 'text-stop' : 'text-ink'}`}>{p.discount > 0 ? `${pct(p.discount)} מתחת` : `${pct(-p.discount)} מעל`}</Num></div>
+            <div className="text-2xs text-ink-3 mt-1">{L.refNb}{L.refExact ? '' : ' (שכונת ברירת מחדל לרובע)'} · נדל״ן.gov.il · {L.refWhen}. ממוצע לכל השכונה, לא לרחוב: דירה קטנה או בקומה נמוכה תיראה זולה גם במחיר מלא.</div>
+          </>) : <div className="text-2xs text-ink-3">אין ממוצע עסקאות בשכונה לדירה בגודל הזה, ולכן אין השוואה.</div>}
+        </div>
+        <div className="flex justify-end gap-2 mt-2">
+          <Btn variant="ghost" className="h-8 px-2.5" onClick={() => setEdit(true)}>עדכון</Btn>
+          <Btn variant="ghost" className="h-8 px-2.5" onClick={() => write(`${p.gush}-${p.chelka}`, null)}>מחיקה</Btn>
+        </div>
+      </>) : <ListingForm p={p} onDone={() => setEdit(false)} />}
+      {nr && <div className="mt-3"><div className="eyebrow mb-1">ממוצע עסקאות בשכונה ({nr.name})</div>
+        <div className="grid grid-cols-3 gap-px bg-line rounded-lg overflow-hidden border border-line">
+          {['3', '4', '5'].map(k => { const r = nr.rooms[k]; return <div key={k} className="bg-white p-1.5 text-center"><div className="text-2xs text-ink-3"><Num>{k}</Num> חד׳</div><Num className="text-[12.5px] font-bold text-ink">{r ? ils(r.yearAvg || r.last) : '—'}</Num></div>; })}
+        </div></div>}
+    </Section>
+  );
 }
 
 const ils2 = n => (n < 0 ? '−' : '') + ils(Math.abs(n));
@@ -1232,7 +1321,7 @@ function Header({ onOpenAbout, onOpenDev, devMissing, onOpenRules, query, setQue
 
         {/* Pipeline */}
         <div ref={pipeRef} className="relative ms-auto flex items-center gap-2">
-          <span className="hidden md:inline-flex items-center gap-1 text-2xs font-semibold text-act-ink bg-act-soft ring-1 ring-inset ring-act/30 rounded-md px-1.5 py-0.5">חלקות ופרוטוקולים: אמיתי · שוק וטאבו: הדגמה <Info k="datapill" className="ms-1" /></span>
+          <span className="hidden md:inline-flex items-center gap-1 text-2xs font-semibold text-act-ink bg-act-soft ring-1 ring-inset ring-act/30 rounded-md px-1.5 py-0.5">נתוני עירייה ומדינה: אמיתי · טאבו לדירה: הדגמה <Info k="datapill" className="ms-1" /></span>
           <Btn variant="soft" className="h-9 px-3" onClick={onOpenAbout}><Icon name="info" className="w-4 h-4" /><span>איך זה עובד</span></Btn>
           <Btn variant="ghost" className="h-9 px-3 relative" onClick={onOpenDev}><Icon name="scale" className="w-4 h-4" /><span className="hidden sm:inline">פרמטרים יזמיים</span>{devMissing && <span className="absolute -top-1 -end-1 w-2.5 h-2.5 rounded-full bg-stop ring-2 ring-white" />}</Btn><Info k="dev" />
           <Btn variant="ghost" className="h-9 px-3" onClick={onOpenRules}><Icon name="layers" className="w-4 h-4" /><span className="hidden sm:inline">ספריית כללים</span><span className="num text-[11px] text-ink-3">{RULES.length}</span></Btn><Info k="rules" />
@@ -1549,7 +1638,7 @@ const SORTS = {
   verified: { label: 'זכויות מאומתות', get: p => p.verifiedAdd ?? -1 },
   unused: { label: 'טווח (עליון)', get: p => p.rangeHi },
   ratio: { label: 'יחס לא מנוצל', get: p => p.unusedRatio },
-  uplift: { label: 'השבחה', get: p => p.upliftApproval },
+  uplift: { label: 'מודעה מתחת לשכונה', get: p => p.discount ?? -9 },
   profit: { label: 'רווח יזמי', get: p => p.econ && p.econ.state === 'ok' ? p.econ.best.profit : -1e15 },
   profitPct: { label: 'רווח יזמי %', get: p => p.econ && p.econ.state === 'ok' ? p.econ.best.pct : -1e9 },
   year: { label: 'שנת בנייה', get: p => p.year }
@@ -2016,11 +2105,11 @@ function AboutModal({ onClose, onOpenDev }) {
         <section className="grid sm:grid-cols-2 gap-3">
           <div className="rounded-lg border border-line p-3 grid gap-1.5">
             <div className="text-[12.5px] font-bold text-go-ink">נתונים אמיתיים</div>
-            {bullets(['חלקות, מבנים, שימור ואזור ההכרזה (GIS עירוני)', 'היתרים, בקשות ותכניות', 'פרוטוקולי הוועדה 2025–2026', 'מספר בעלים וסוג בעלות (פנקסי המקרקעין)', 'מחירי ייחוס לשכונה (נדל״ן.gov.il)'], '#10B981')}
+            {bullets(['חלקות, מבנים, שימור ואזור ההכרזה (GIS עירוני)', 'היתרים, בקשות ותכניות', 'פרוטוקולי הוועדה 2025–2026', 'מספר בעלים וסוג בעלות (פנקסי המקרקעין)', 'מחירי ייחוס לשכונה (נדל״ן.gov.il)', 'מודעות שאתם מזינים, מול מחירי השכונה'], '#10B981')}
           </div>
           <div className="rounded-lg border border-line p-3 grid gap-1.5">
             <div className="text-[12.5px] font-bold text-act-ink">עדיין לא, או הדגמה</div>
-            {bullets(['הערות אזהרה, משכנתאות ושמות בעלים: דורשים נסח טאבו', 'מחירי מודעות: הדגמה', 'מרתפים ובנייה על הגג: הזנה ידנית'], '#F59E0B')}
+            {bullets(['הערות אזהרה, משכנתאות ושמות בעלים: דורשים נסח טאבו', 'מרתפים ובנייה על הגג: הזנה ידנית'], '#F59E0B')}
           </div>
         </section>
 
@@ -2218,7 +2307,7 @@ function Inspector({ onOpenDev, p, onClose, onExport, onSave, saved, onContact, 
         <div className="grid grid-cols-3 gap-px bg-line rounded-lg overflow-hidden border border-line mt-3">
           {[
             { i: 'k_verified', l: 'זכויות מאומתות', v: p.verifiedAdd != null ? <><Num>+{n0(p.verifiedAdd)}</Num><span className="text-[11px] font-semibold"> מ״ר</span></> : '—', s: `טווח +${n0(p.rangeLo)}–${n0(p.rangeHi)} מ״ר`, tone: 'text-go-ink' },
-            { i: 'k_uplift', l: 'השבחה לאחר אישור', v: <Num>{signPct(p.upliftApproval)}</Num>, s: p.hasListing ? 'מול המחיר המבוקש' : 'מול שווי נוכחי', tone: p.upliftApproval > 0.1 ? 'text-go-ink' : 'text-ink' },
+            { i: 'k_uplift', l: 'מודעה מול השכונה', v: p.discount != null ? <Num>{p.discount > 0 ? `−${pct(p.discount)}` : `+${pct(-p.discount)}`}</Num> : '—', s: p.hasListing ? (p.discount != null ? 'מול ממוצע עסקאות' : 'אין ממוצע להשוואה') : 'אין מודעה שהוזנה', tone: p.discount > 0.05 ? 'text-go-ink' : p.discount != null && p.discount < -0.05 ? 'text-stop' : 'text-ink-4' },
             p.econ && p.econ.state === 'ok' ? { i: 'k_profit', l: 'רווח יזמי', v: <Num>{ils2(p.econ.best.profit)}</Num>, s: `${pct(p.econ.best.pct, 0)} מהעלויות · ${p.econ.ok ? 'עובר את הסף' : 'מתחת לסף'}`, tone: p.econ.ok ? 'text-go-ink' : 'text-stop' } : { i: 'k_profit', l: 'רווח יזמי', v: '—', s: 'הזינו פרמטרים יזמיים', tone: 'text-ink-4' }
           ].map(k => (
             <div key={k.l} className="bg-white p-2 min-w-0">
@@ -2296,37 +2385,7 @@ function Inspector({ onOpenDev, p, onClose, onExport, onSave, saved, onContact, 
           </ol>
         </Section>
 
-        <Section info="market" eyebrow="התאמת מודעות שוק" title="מודעות פעילות מול שווי עתידי" icon="scale">
-          <div className="mb-2 text-2xs rounded-md bg-act-soft text-act-ink px-2 py-1">מודעות ומחירים: הדגמה. אין חיבור ליד2 או למדלן.</div>
-          {p.listing ? (
-            <div className="rounded-lg border border-line p-2.5 flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <div className="flex items-center gap-1.5 text-[12.5px] font-bold text-ink"><span className="text-2xs font-bold px-1.5 py-0.5 rounded bg-ink text-white">{p.listing.source}</span>{p.listing.rooms} חד׳ · קומה <Num>{p.listing.floor}</Num> · <Num>{p.listing.sqm}</Num> מ״ר</div>
-                <div className="text-2xs text-ink-3 mt-0.5">מוכר: {p.listing.seller} · <Num>{p.listing.dom}</Num> ימים באוויר</div>
-              </div>
-              <div className="text-end shrink-0"><Num className="text-[15px] font-bold text-ink">{ils(p.listing.price)}</Num><div className="text-2xs text-ink-3"><Num>{ilsK(p.listing.ppsqm)}</Num>/מ״ר</div></div>
-            </div>
-          ) : (
-            <div className="rounded-lg border border-dashed border-line p-2.5 text-[12px] text-ink-3">אין כרגע מודעה פעילה בבניין. החישוב מטה מבוסס על דירה טיפוסית של <Num>{p.unitSqm}</Num> מ״ר. אפשר להפעיל התראה על מודעה חדשה.</div>
-          )}
-
-          <div className="mt-3"><div className="eyebrow mb-1.5">מחיר למ״ר · ₪</div><PpsqmChart p={p} /></div>
-
-          <div className="mt-3 rounded-lg bg-canvas border border-line text-[12px]">
-            {[
-              [p.hasListing ? 'מחיר מבוקש' : 'שווי שוק נוכחי', ils(p.basis), `${n0(p.unitSqm)} מ״ר × ${ilsK(p.basis / p.unitSqm)}`],
-              ['שווי לאחר אישור', ils(p.postApproval), `× ${ROUTES[p.route].uplift.toFixed(2)} מקדם השבחה`],
-              ['שווי דירה חדשה', ils(p.postBuild), `${n0(p.newSqm)} מ״ר (+${p.newSqm - p.unitSqm}) × ${ilsK(p.newPpsqm)}`],
-              ['מכפיל הון', `×${(p.postBuild / p.basis).toFixed(2)}`, `תשואה שנתית ${pct(p.cagr, 1)} על ${p.years} שנים`]
-            ].map(([a, b, c], i) => (
-              <div key={a} className={`flex items-center justify-between gap-2 px-2.5 py-1.5 ${i ? 'border-t border-line' : ''}`}>
-                <div className="min-w-0"><div className="font-semibold text-ink">{a}</div><div className="text-2xs text-ink-3"><Num>{c}</Num></div></div>
-                <Num className={`font-bold ${i === 3 ? 'text-go-ink' : 'text-ink'}`}>{b}</Num>
-              </div>
-            ))}
-          </div>
-          <p className="text-2xs text-ink-3 mt-2 leading-snug">הנחות: היזם נושא בעלות הבנייה ובשכר הדירה בתקופת הבנייה. לא כולל מס רכישה, היטל השבחה במקרה של מכירה לפני מימוש, ומימון. לוח הזמנים לפי שלב: יעד נקי 7 שנים, פרוטוקול 6, תיק פתוח 4.5.</p>
-        </Section>
+        <MarketSection p={p} />
       </div>
 
       {/* Actions */}
@@ -2370,11 +2429,10 @@ function teaserText(p) {
     `גוש ${p.gush} · חלקה ${p.chelka} · ${p.units} יח״ד · נבנה ${p.year}`,
     `מסלול: ${ROUTES[p.route].label} · סטטוס: ${STATUS[p.status].label}`,
     `זכויות: ${n0(p.built)} מ״ר בנויים מתוך ${n0(p.allowed)} מותרים (+${n0(p.unused)} מ״ר, ${p.addText})`,
-    p.hasListing ? `מודעה: ${ils(p.listPrice)} ל-${p.unitSqm} מ״ר (${ilsK(p.listPpsqm)}/מ״ר, ${pct(p.discount)} מתחת לממוצע הרחוב)` : `שווי יח׳ טיפוסית: ${ils(p.marketValue)}`,
-    `שווי לאחר אישור: ${ils(p.postApproval)} · דירה חדשה: ${ils(p.postBuild)} · תשואה שנתית משוערת ${pct(p.cagr, 1)}`,
+    p.hasListing ? `מודעה: ${ils(p.listPrice)} ל-${p.unitSqm} מ״ר (${ilsK(p.listPpsqm)}/מ״ר${p.discount != null ? `, ${p.discount > 0 ? pct(p.discount) + ' מתחת' : pct(-p.discount) + ' מעל'} לממוצע העסקאות בשכונה` : ''})` : null,
     `תזה: ${p.ai}`,
-    `ציון ודאות AI: ${p.score}/100 · נתוני הדגמה`
-  ].join('\n');
+    `ציון AI: ${p.score}/100 · פרטי טאבו לדירות: הדגמה עד שיוזן נסח`
+  ].filter(Boolean).join('\n');
 }
 
 function TeaserModal({ p, onClose, toast }) {
@@ -2392,7 +2450,7 @@ function TeaserModal({ p, onClose, toast }) {
           <div className="text-center"><div className="num text-[26px] font-bold leading-none">{p.score}</div><div className="text-2xs text-white/60">ציון AI</div></div>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-line">
-          {[['יתרת זכויות', `+${n0(p.unused)} מ״ר`], ['מסלול', p.addText], ['השבחה לאחר אישור', signPct(p.upliftApproval)], ['תשואה שנתית', pct(p.cagr, 1)]].map(([l, v]) => (
+          {[['יתרת זכויות', `+${n0(p.unused)} מ״ר`], ['מסלול', p.addText], ['דירות בבניין', `${p.units}`], ['רווח יזמי', p.econ && p.econ.state === 'ok' ? ils2(p.econ.best.profit) : '—']].map(([l, v]) => (
             <div key={l} className="bg-white p-2.5"><div className="text-2xs text-ink-3">{l}</div><Num className="text-[16px] font-bold text-ink">{v}</Num></div>
           ))}
         </div>
@@ -2427,7 +2485,7 @@ ___`);
   const channels = [
     { id: 'letter', title: 'מכתב לכתובת הנכס', detail: 'מכתב פיזי לתיבות הדואר בבניין. ללא שימוש בפרטים אישיים מהטאבו.' },
     { id: 'executor', title: 'פנייה למנהל העזבון', detail: 'דרך עו״ד המטפל בעזבון, לפי צו הירושה או צו קיום הצוואה.', disabled: !p.estate },
-    { id: 'broker', title: 'דרך המתווך במודעה', detail: p.hasListing ? `המודעה ב${p.listing.source} פעילה ${p.listing.dom} ימים.` : 'אין מודעה פעילה בבניין.', disabled: !p.hasListing }
+    { id: 'broker', title: 'דרך המתווך במודעה', detail: p.hasListing ? `יש מודעה שהוזנה ב-${p.listing.addedAt}${p.listing.url ? ' (עם קישור)' : ''}.` : 'לא הוזנה מודעה בבניין.', disabled: !p.hasListing }
   ];
   return (
     <Modal title={`פנייה · ${p.address}`} onClose={onClose} footer={<>
@@ -2462,6 +2520,7 @@ const useMedia = q => { const [m, setM] = useState(() => window.matchMedia(q).ma
 
 function App() {
   const [dev, saveDev] = useDevParams();
+  const [lst, writeListing] = useListings();
   const [devOpen, setDevOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(() => { try { return !localStorage.getItem('israprop.about.seen'); } catch (e) { return true; } });
   const closeAbout = () => { setAboutOpen(false); try { localStorage.setItem('israprop.about.seen', '1'); } catch (e) {} };
@@ -2472,7 +2531,7 @@ function App() {
   const [overrides, setOverrides] = useState({});
   const [extra, setExtra] = useState(null);
   const [rulesFocus, setRulesFocus] = useState(null);
-  const parcels = useMemo(() => scan.map(s => genParcelC(s.streetId, s.num, s.idx, s.total, overrides[`${s.streetId}-${s.num}`])), [scan, overrides]);
+  const parcels = useMemo(() => scan.map(s => genParcelC(s.streetId, s.num, s.idx, s.total, overrides[`${s.streetId}-${s.num}`])), [scan, overrides, lst.v]);
   const [scanning, setScanning] = useState(false);
   const [scanStep, setScanStep] = useState(0);
   const [chips, setChips] = useState([]);
@@ -2534,7 +2593,7 @@ function App() {
   const visibleIds = useMemo(() => new Set(rows.map(r => r.id)), [rows]);
 
   const parcelsById = useMemo(() => Object.fromEntries(parcels.map(p => [p.id, p])), [parcels]);
-  const extraParcel = useMemo(() => extra ? genParcelC(extra.streetId, extra.num, extra.idx, extra.total, overrides[`${extra.streetId}-${extra.num}`]) : null, [extra, overrides]);
+  const extraParcel = useMemo(() => extra ? genParcelC(extra.streetId, extra.num, extra.idx, extra.total, overrides[`${extra.streetId}-${extra.num}`]) : null, [extra, overrides, lst.v]);
   const selected = selectedId ? (parcelsById[selectedId] || (extraParcel && extraParcel.id === selectedId ? extraParcel : null)) : null;
   if (selected && !selected.econ) selected.econ = econ(selected, dev.values);
   const selectP = p => setSelectedId(p.id);
@@ -2561,6 +2620,7 @@ function App() {
   );
 
   return (
+    <ListingCtx.Provider value={{ st: lst, write: writeListing }}>
     <div className="app flex flex-col">
       <Header onOpenAbout={() => setAboutOpen(true)} onOpenDev={() => setDevOpen(true)} devMissing={dev.src !== 'loading' && !dev.values} onOpenRules={() => setRulesFocus('all')} query={query} setQuery={setQuery} onScan={onScan} scanning={scanning} scanStep={scanStep} scanTarget={target}
         chips={chips} toggleChip={toggleChip} pipeline={pipeline} onOpenParcel={openFromPipeline} parcelsById={parcelsById}
@@ -2602,6 +2662,7 @@ function App() {
         {toasts.map(t => <div key={t.id} className="anim-fade bg-ink text-white text-[12.5px] font-semibold px-3.5 py-2 rounded-lg shadow-pop flex items-center gap-2"><Icon name="check" className="w-4 h-4 text-go" stroke={2.4} />{t.msg}</div>)}
       </div>
     </div>
+    </ListingCtx.Provider>
   );
 }
 
