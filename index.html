@@ -472,11 +472,21 @@ function ST(sid) {
 const REAL_FIELDS = { lotArea: 'שטח רשום', frontage: 'מפוליגון החלקה', floors: 'שכבת מבנים + קומת קרקע', typ: 'תכסית המבנה', permitYear: 'שנת בנייה', pilotis: 'שכבת מבנים', declared: 'שכבת אזור ההכרזה', preservation: 'שכבת שימור' };
 
 const STATUS = {
-  clean:    { label: 'יעד נקי', hint: 'ללא יזם · אפסייד תב״ע גבוה', color: '#10B981', ink: 'text-go-ink', bg: 'bg-go-soft', ring: 'ring-go/30', icon: 'check' },
+  clean:    { label: 'אין סימן ליזם', hint: 'אין היתר, בקשה או אזכור בוועדה · הטאבו לא נבדק', color: '#10B981', ink: 'text-go-ink', bg: 'bg-go-soft', ring: 'ring-go/30', icon: 'check' },
   protocol: { label: 'סימן מוקדם בוועדה', hint: 'אזכור בפרוטוקול או תכנית בהכנה', color: '#06B6D4', ink: 'text-pre-ink', bg: 'bg-pre-soft', ring: 'ring-pre/30', icon: 'radar' },
   file:     { label: 'בקשה להיתר פתוחה', hint: 'בקשת תוספת / הריסה בתהליך', color: '#F59E0B', ink: 'text-act-ink', bg: 'bg-act-soft', ring: 'ring-act/30', icon: 'file' },
   signed:   { label: 'פרויקט פעיל · דלג', hint: 'היתר התחדשות הוצא או בניין חדש', color: '#64748B', ink: 'text-skip-ink', bg: 'bg-skip-soft', ring: 'ring-skip/30', icon: 'ban' }
 };
+/* Funnel stage. Without a nesach the tool can only say "worth checking"; "clean in Tabu" needs an uploaded nesach. */
+const STAGE = {
+  order:     { label: 'מועמד · להזמין נסח', short: 'להזמין נסח', cls: 'bg-accent-soft text-accent ring-accent/30', info: 'st_order' },
+  clean:     { label: 'נקי בטאבו', short: 'נקי בטאבו', cls: 'bg-go text-white ring-go', info: 'st_clean' },
+  contested: { label: 'מתחרה בטאבו', short: 'מתחרה בטאבו', cls: 'bg-act-soft text-act-ink ring-act/30', info: 'st_contested' },
+  skip:      { label: 'דילוג', short: 'דילוג', cls: 'bg-skip-soft text-skip-ink ring-skip/30', info: null },
+  watch:     { label: 'לא בעדיפות', short: '', cls: '', info: null }
+};
+const StageChip = ({ p, size = 'sm' }) => { const g = STAGE[p.stage]; if (!g || !g.short) return null; return <span className={`inline-flex items-center gap-1 ${size === 'sm' ? 'text-2xs px-1.5 py-px' : 'text-[11.5px] px-2 py-[3px]'} rounded-md font-semibold ring-1 ring-inset whitespace-nowrap ${g.cls}`}>{p.stage === 'clean' ? <Icon name="check" className="w-3 h-3" stroke={2.4} /> : p.stage === 'order' ? <Icon name="key" className="w-3 h-3" /> : null}{size === 'sm' ? g.short : g.label}</span>; };
+
 const ROUTES = {
   rova:         { label: 'תכנית רובע בתוקף', short: 'תכנית רובע', uplift: 1.15 },
   ig:           { label: 'תא/4562 · התחדשות רחוב אבן גבירול', short: 'תא/4562 · אבן גבירול', uplift: 1.15 },
@@ -608,7 +618,11 @@ function genParcel(streetId, num, idx, total, ov) {
   if (nonPrivate.length) s -= 6;
   if (status === 'signed') s = Math.min(s, 22);
   const score = Math.round(Math.max(5, Math.min(97, s)));
-  const highConviction = score >= 70 && status !== 'signed';
+  const nsCo = NS ? NS.s.warnBy.filter(b => b.kind === 'חברה') : [];
+  // Provisional; refined by economics in App once developer parameters exist (passes the minimum profit -> order).
+  const screenOk = (status === 'clean' || status === 'protocol') && !preservation;
+  const stage = status === 'signed' ? 'skip' : NS ? (nsCo.length ? 'contested' : status === 'file' ? 'watch' : 'clean') : screenOk && calc.verified != null && calc.verified - built >= 600 ? 'order' : 'watch';
+  const highConviction = stage === 'order' || stage === 'clean';
 
   // Units (Tabu sub-parcels)
   const ur = mulberry32(hashStr(streetId + '#' + num + '#units'));
@@ -687,7 +701,7 @@ function genParcel(streetId, num, idx, total, ov) {
     inputs: inp, baseInputs: base, overridden: ov ? Object.keys(ov) : [], calc,
     status, route, preservation, developer, architect, signedUnits, estate, roofAttached, condoRegistered, mortgages, lien,
     hasListing, listing, unitSqm, listPrice, listPpsqm, discount, marketValue, postApproval, postBuild, newSqm, newPpsqm, years,
-    basis, upliftApproval, cagr, mkt: S.mkt, score, highConviction, unitList, plans, events, ai, real: !!R, poly: R ? R.poly : null,
+    basis, upliftApproval, cagr, mkt: S.mkt, score, stage, stage0: stage, screenOk, highConviction, unitList, plans, events, ai, real: !!R, poly: R ? R.poly : null,
     ctx: ctxOf(R), mentions: MN.length, ownReal: !!own, ownTypes, nonPrivate, verifiedAdd: calc.verified != null ? calc.verified - built : null, rangeLo: calc.range.lo - built, rangeHi: calc.range.hi - built
   };
 }
@@ -911,6 +925,10 @@ const Icon = ({ name, className = 'w-4 h-4', stroke = 1.8 }) => (
    4b. INFO TIPS
    ========================================================================= */
 const INFO = {
+  st_order: 'שלב 1 במשפך: לפי הנתונים הציבוריים הבניין שווה בדיקה. אין היתר, בקשה או סימן ליזם, ובנוסף: אם הזנתם פרמטרים יזמיים, הרווח עובר את הסף המינימלי שלכם; אם לא, יש תוספת מאומתת של 600 מ״ר ומעלה (כ-6 דירות חדשות). הטאבו עוד לא נבדק: יזם שהחתים דיירים ולא הגיש כלום לא מופיע בשום מקור ציבורי. הצעד הבא: להזמין נסח מרוכז ולהעלות אותו בסעיף הטאבו.',
+  st_clean: 'שלב 2 במשפך: הועלה נסח, ואין עליו הערות אזהרה לטובת חברה. זה הבניין שעליו יוצאים לסיור ופונים לבעלים. עדיין כדאי לבדוק את תיק הבניין בעירייה ולקבל חוות דעת שמאי ועורך דין.',
+  st_contested: 'הועלה נסח, ויש בו הערות אזהרה לטובת חברה על פחות מחצי מהדירות. יזם התחיל להחתים ועוד אין לו רוב. אפשר להתחרות, אבל הוא מקדים אתכם.',
+  orderlist: 'הבניינים בשלב ״להזמין נסח״ בסריקה הנוכחית, ממוינים לפי הרווח היזמי (או לפי הציון כשאין פרמטרים). העתיקו את גוש וחלקה לטופס הזמנת הנסח, בסוג ״נסח מרוכז״, ואחר כך העלו כל נסח בכרטיס הבניין.',
   ctx: 'מה יש סביב הבניין היום ומה מתוכנן: רכבת קלה, מטרו, אוטובוסים, חינוך, פארקים, רעש ותקן חניה. נשלף מה-GIS של העירייה ונמדד מגבול החלקה. זה מידע בלבד: לא משנה את הציון ולא את הרווח. מה שכבר קיים (אוטובוסים, בתי ספר, גינות) כבר מגולם במחיר השכונתי, ולכן ספירה כפולה הייתה מנפחת את הרווח.',
   ctx_transit: 'תחנת הרכבת הקלה הקרובה בכל קו, והמרחק מהמטרו. ברכבת הקלה מופיעות תחנות אמיתיות. במטרו העירייה מפרסמת רק את תוואי הקו, בלי מיקום תחנות, ולכן המרחק הוא לתוואי ולא לתחנה. מחירים נוטים לעלות סמוך לפתיחה, לא באישור, ומועדי פתיחה בישראל נדחים לעיתים קרובות.',
   ctx_future: 'הבניין נמצא עד 500 מ׳ מתחנה של קו רכבת קלה שעוד לא פועל (סגול או ירוק), או עד 400 מ׳ מתוואי מטרו. שימו לב: במרכז העיר זה נכון לכ-91% מהחלקות, ולכן זה לא יתרון מיוחד. מה שמבדל הוא צמידות (עד 200 מ׳, המסנן ״צמוד לתחנה עתידית״). צמידות לתחנה עילית יכולה גם להוריד ערך בחזית בגלל רעש ועבודות.',
@@ -931,13 +949,13 @@ const INFO = {
   legend: 'יעד נקי: אין היתר ואין בקשה. סימן מוקדם: הופיע בפרוטוקול ועדה או בתכנית בהכנה, בלי היתר. בקשה פתוחה: בקשה להיתר בתהליך. פרויקט פעיל: היתר התחדשות מ-2018 או בניין שנבנה מ-2008, ולכן לדלג.',
   density: 'סיכום של כל החלקות בסריקה הנוכחית, לא רק של אלה שמוצגות בטבלה.',
   t_total: 'מספר החלקות הבנויות בתחום הסריקה.',
-  t_hc: 'חלקות עם ציון 70 ומעלה שאין בהן פרויקט פעיל.',
+  t_hc: 'בניינים בלי סימן ציבורי ליזם שעוברים את סף הרווח שלכם, או בלי פרמטרים תוספת מאומתת של 600 מ״ר ומעלה (״להזמין נסח״), ובניינים שהועלה להם נסח בלי הערות אזהרה של חברה (״נקי בטאבו״).',
   t_signed: 'חלקות עם היתר התחדשות מ-2018 ואילך או בניין שנבנה מ-2008. כנראה כבר תפוסות.',
   t_ratio: 'ממוצע החלק מהזכויות המותרות שעוד לא נבנה. בשורה התחתונה: סך המ״ר הפנויים בחלקות שאין בהן פרויקט פעיל.',
   breakdown: 'כמה חלקות יש בכל סטטוס.',
   feed: 'כל החלקות בסריקה, מדורגות לפי המיון שבחרתם. לחיצה על שורה פותחת את בוחן הנכס. מוצגות 150 בכל פעם.',
-  tabs: 'כל הבניינים. ודאות גבוהה: ציון 70 ומעלה בלי פרויקט פעיל. דילוג: פרויקטים פעילים ובקשות של יזם.',
-  col_score: 'ציון מיון מ-0 עד 100. מעלה אותו: הרבה זכויות לא מנוצלות, סטטוס נקי או סימן מוקדם, ומעט בעלים. מוריד אותו: שימור, בעלות לא פרטית ותכנית שעדיין לא בתוקף. זה כלי מיון ולא הערכת שווי.',
+  tabs: 'כל הבניינים. מועמדים: ״להזמין נסח״ (בלי סימן ציבורי ליזם, ורווח מעל הסף שלכם או תוספת מאומתת של 600 מ״ר ומעלה) ו״נקי בטאבו״ (נסח הועלה ואין הערות אזהרה של חברה). דילוג: פרויקטים פעילים או בניינים שיזם נעל בטאבו.',
+  col_score: 'ציון סינון מ-0 עד 100. נוסחה ולא בינה מלאכותית: עד 38 נקודות על זכויות לא מנוצלות, עד 34 על הסטטוס (אין סימן ליזם או סימן מוקדם בוועדה), עד 18 על מודעה שהזנתם מתחת לשכונה, ותיקונים על שימור, בעלות לא פרטית, מספר בעלים ותכנית שטרם בתוקף. הוא אומר איזה בניין שווה בדיקה, לא שהבניין הוא עסקה: יזם שהחתים דיירים ועוד לא הגיש כלום נראה רק בנסח הטאבו.',
   col_addr: 'כל שורה היא בניין שלם על חלקה אחת (גוש/חלקה), לא דירה בודדת. מוצגים: כתובת ראשית מה-GIS, שנת בנייה, קומות (ק+N פירושו קרקע ועוד N) ומספר הדירות בבניין. מספר בלי סימן: תתי-חלקות רשומות בטאבו (נתון אמיתי). עם ~: הערכה לפי קומות ותכסית, כי הבית המשותף לא רשום.',
   col_status: 'שורה עליונה: סטטוס הפעילות בחלקה. ירוק, יעד נקי: אין היתר ואין בקשה. תכלת, סימן מוקדם: הופיע בפרוטוקול ועדה או בתכנית בהכנה, בלי היתר. כתום, בקשה פתוחה: בקשה להיתר בתהליך. אפור, פרויקט פעיל: היתר התחדשות מ-2018 או בניין חדש, ולכן לדלג. שורה תחתונה: התכנית שחלה על החלקה. המקרא המלא מופיע גם מעל הטבלה.',
   v_pend: 'תכנית רובעים 5–6 (תא/מק/4320) אושרה בוועדה המחוזית באוקטובר 2026 ועוד לא פורסמה ברשומות. תכנית נכנסת לתוקף רק ביום הפרסום, ולכן עדיין אין זכות שאפשר להוציא עליה היתר. בעמודה ״טווח אפשרי״ רואים מה התכנית תאפשר אחרי הפרסום. זה החלון שלפני שהשוק מתמחר אותה.',
@@ -1092,6 +1110,7 @@ const QUICK_FILTERS = [
   { id: 'noDev', label: 'ללא פרויקט פעיל', test: p => p.status !== 'signed' },
   { id: 'protocol', label: 'סימן מוקדם בוועדה', test: p => p.status === 'protocol' },
   { id: 'under', label: 'מודעה מתחת לשכונה', test: p => p.discount != null && p.discount >= 0.08 },
+  { id: 'cleanTabu', label: 'נקי בטאבו', test: p => p.stage === 'clean' },
   { id: 'transit', label: 'צמוד לתחנה עתידית', test: p => !!(p.ctx && p.ctx.adj.length) }
 ];
 
@@ -1678,7 +1697,7 @@ function CadastralMap({ parcels, visibleIds, selectedId, onSelect, highlightId, 
           <span key={k} className="inline-flex items-center gap-1.5 text-2xs text-ink-2"><span className="w-2.5 h-2.5 rounded-sm" style={{ background: s.color }} />{s.label}</span>
         ))}
         <span className="inline-flex items-center gap-1.5 text-2xs text-ink-2"><svg width="10" height="10" viewBox="0 0 10 10"><path d="M5 1l4 4-4 4-4-4z" fill="#B45309" /></svg>מבנה לשימור</span>
-        <span className="inline-flex items-center gap-1.5 text-2xs text-ink-2"><svg width="10" height="10" viewBox="0 0 10 10"><circle cx="5" cy="5" r="3" fill="#fff" stroke="#047857" strokeWidth="1.4" /></svg>ודאות גבוהה</span>
+        <span className="inline-flex items-center gap-1.5 text-2xs text-ink-2"><svg width="10" height="10" viewBox="0 0 10 10"><circle cx="5" cy="5" r="3" fill="#fff" stroke="#047857" strokeWidth="1.4" /></svg>מועמד</span>
       </div>
     </Card>
   );
@@ -1758,7 +1777,7 @@ function DensityMetrics({ parcels, target }) {
   const counts = Object.keys(STATUS).map(k => ({ k, n: parcels.filter(p => p.status === k).length }));
   const tiles = [
     { info: 't_total', label: 'בניינים שנסרקו', value: total, sub: target?.type === 'hood' ? 'בשכונה הנבחרת' : 'ברחוב הנבחר' },
-    { info: 't_hc', label: 'הזדמנויות ארביטראז׳ בוודאות גבוהה', value: hc, sub: `${pct(total ? hc / total : 0)} מהבניינים`, tone: 'text-go-ink' },
+    { info: 't_hc', label: 'מועמדים: להזמין נסח או נקי בטאבו', value: hc, sub: `${pct(total ? hc / total : 0)} מהבניינים`, tone: 'text-go-ink' },
     { info: 't_signed', label: 'פרויקט פעיל · היתר או בניין חדש', value: signed, sub: 'ברשימת דילוג', tone: 'text-skip-ink' },
     { info: 't_ratio', label: 'יחס זכויות לא מנוצלות (ממוצע)', value: pct(avgUnused), sub: <>+<Num>{n0(unusedSqm)}</Num> מ״ר פנויים ללא יזם</> }
   ];
@@ -1806,11 +1825,11 @@ function DensityMetrics({ parcels, target }) {
    ========================================================================= */
 const TABS = [
   { id: 'all', label: 'כל הבניינים ברחוב', test: () => true },
-  { id: 'hc', label: 'ארביטראז׳ בוודאות גבוהה', test: p => p.highConviction },
+  { id: 'hc', label: 'מועמדים (להזמין נסח / נקי בטאבו)', test: p => p.highConviction },
   { id: 'skip', label: 'פרויקטים פעילים של יזמים (דילוג)', test: p => p.status === 'signed' || (p.status === 'file' && p.developer) }
 ];
 const SORTS = {
-  score: { label: 'ציון AI', get: p => p.score },
+  score: { label: 'ציון סינון', get: p => p.score },
   address: { label: 'כתובת', get: p => p.street + String(p.num).padStart(4, '0') },
   verified: { label: 'זכויות מאומתות', get: p => p.verifiedAdd ?? -1 },
   unused: { label: 'טווח (עליון)', get: p => p.rangeHi },
@@ -1853,7 +1872,7 @@ function OpportunityTable({ onOpenDev, compact, rows, sort, setSort, selectedId,
       <table className={`w-full ${compact ? "min-w-[760px]" : "min-w-[900px]"} text-[12.5px] border-separate border-spacing-0`}>
         <thead className="sticky top-0 z-10 bg-[#FBFCFD] text-2xs text-ink-3 uppercase">
           <tr className="[&>th]:border-b [&>th]:border-line">
-            <SortTh info="col_score" k="score" sort={sort} setSort={setSort} className="w-[96px]">ציון AI</SortTh>
+            <SortTh info="col_score" k="score" sort={sort} setSort={setSort} className="w-[96px]">ציון סינון</SortTh>
             <SortTh info="col_addr" k="address" sort={sort} setSort={setSort}>בניין · גוש/חלקה</SortTh>
             <th className="px-2.5 py-2 font-semibold text-start whitespace-nowrap">סטטוס · מסלול <Info k="col_status" className="ms-1" /></th>
             <SortTh info="col_verified" k="verified" sort={sort} setSort={setSort} className="w-[150px]">זכויות מאומתות</SortTh>
@@ -1876,7 +1895,7 @@ function OpportunityTable({ onOpenDev, compact, rows, sort, setSort, selectedId,
                   <div className="text-2xs text-ink-3">גוש <Num>{p.gush}</Num> · חלקה <Num>{p.chelka}</Num> · <Num>{p.year}</Num> · ק+<Num>{p.floors - 1}</Num> · {p.condoRegistered && p.ownReal ? '' : '~'}<Num>{p.units}</Num> דירות</div>
                   {p.ctx && p.ctx.adj.length > 0 && <div className="mt-0.5 inline-flex items-center gap-1 text-2xs font-semibold px-1 rounded" style={{ color: TRANSIT[p.ctx.adj[0].line].color, background: TRANSIT[p.ctx.adj[0].line].color + '14' }}><Icon name="train" className="w-3 h-3" />{TRANSIT[p.ctx.adj[0].line].label} · <Num>{fmtM(p.ctx.adj[0].d)}</Num></div>}
                 </td>
-                <td className="px-2.5 py-2 align-middle"><div className="flex flex-col items-start gap-1"><StatusBadge status={p.status} size="sm" /><RouteChip route={p.route} preservation={p.preservation} /></div></td>
+                <td className="px-2.5 py-2 align-middle"><div className="flex flex-col items-start gap-1"><StatusBadge status={p.status} size="sm" /><StageChip p={p} /></div></td>
                 <td className="px-2.5 py-2 align-middle whitespace-nowrap">
                   {p.verifiedAdd != null ? (<>
                     <div className={`font-bold text-[13px] ${skip ? 'text-ink-3' : 'text-go-ink'}`}><Num>+{n0(p.verifiedAdd)}</Num> מ״ר</div>
@@ -1948,7 +1967,34 @@ function ScanningState({ step, target }) {
   );
 }
 
-function FeedColumn({ onOpenDev, compact, parcels, rows: allRows, tab, setTab, sort, setSort, view, setView, selectedId, onSelect, scanning, scanStep, target, setHighlightId, highlightId, chipsActive }) {
+function OrderListModal({ rows, onClose, toast }) {
+  const list = rows.filter(p => p.stage === 'order').sort((a, b) => {
+    const pa = a.econ && a.econ.state === 'ok' ? a.econ.best.profit : null, pb = b.econ && b.econ.state === 'ok' ? b.econ.best.profit : null;
+    return pa != null && pb != null ? pb - pa : b.score - a.score;
+  }).slice(0, 20);
+  const text = ['כתובת\tגוש\tחלקה\tדירות\tציון\tרווח יזמי', ...list.map(p => [p.address, p.gush, p.chelka, p.units, p.score, p.econ && p.econ.state === 'ok' ? Math.round(p.econ.best.profit) : ''].join('\t'))].join('\n');
+  const taRef = useRef(null);
+  const copy = async () => { try { await navigator.clipboard.writeText(text); toast('הרשימה הועתקה'); } catch (e) { taRef.current && taRef.current.select(); toast('סמנו והעתיקו ידנית (Ctrl+C)'); } };
+  const csvHref = 'data:text/csv;charset=utf-8,' + encodeURIComponent('﻿' + text.replace(/\t/g, ','));
+  return (
+    <Modal title="רשימה להזמנת נסחים" onClose={onClose} wide footer={<>
+      <span className="text-2xs text-ink-3 me-auto">{list.length} בניינים · לפי {list.some(p => p.econ && p.econ.state === 'ok') ? 'רווח יזמי' : 'ציון סינון'}</span>
+      <a href={csvHref} download="nesach-order-list.csv" className="h-9 px-3 inline-flex items-center rounded-lg border border-line text-[12.5px] font-semibold text-ink hover:bg-canvas">הורדת CSV</a>
+      <Btn variant="primary" className="h-9 px-3" onClick={copy}>העתקה</Btn>
+    </>}>
+      <p className="text-[13px] text-ink-2 leading-relaxed mb-3">אלה הבניינים שעברו את הסינון הציבורי ועוד לא נבדקו בטאבו. הזמינו לכל אחד <b>נסח מרוכז</b> לפי גוש וחלקה, והעלו אותו בכרטיס הבניין. בניין בלי הערות אזהרה של חברה יסומן ״נקי בטאבו״. <Info k="orderlist" /></p>
+      {list.length ? (
+        <div className="border border-line rounded-lg overflow-hidden mb-2"><table className="w-full text-[12.5px]">
+          <thead className="bg-canvas text-ink-3 text-2xs"><tr className="[&>th]:px-2 [&>th]:py-1.5 [&>th]:text-start"><th>כתובת</th><th>גוש</th><th>חלקה</th><th>דירות</th><th>ציון</th><th>רווח יזמי</th></tr></thead>
+          <tbody>{list.map(p => <tr key={p.id} className="border-t border-line-soft [&>td]:px-2 [&>td]:py-1"><td className="font-semibold text-ink">{p.address}</td><td><Num>{p.gush}</Num></td><td><Num>{p.chelka}</Num></td><td><Num>{p.units}</Num></td><td><Num>{p.score}</Num></td><td><Num>{p.econ && p.econ.state === 'ok' ? ils2(p.econ.best.profit) : '—'}</Num></td></tr>)}</tbody>
+        </table></div>
+      ) : <div className="text-[12.5px] text-ink-3 rounded-lg border border-dashed border-line p-3">אין בסריקה הזו בניינים בשלב ״להזמין נסח״. נסו רחוב אחר או סריקת רובע.</div>}
+      <textarea ref={taRef} readOnly value={text} dir="rtl" className="sr-only" aria-hidden="true" />
+    </Modal>
+  );
+}
+
+function FeedColumn({ onOpenOrder, onOpenDev, compact, parcels, rows: allRows, tab, setTab, sort, setSort, view, setView, selectedId, onSelect, scanning, scanStep, target, setHighlightId, highlightId, chipsActive }) {
   const counts = useMemo(() => Object.fromEntries(TABS.map(t => [t.id, parcels.filter(t.test).length])), [parcels]);
   const [limit, setLimit] = useState(150);
   useEffect(() => setLimit(150), [target, tab]);
@@ -2003,7 +2049,8 @@ function FeedColumn({ onOpenDev, compact, parcels, rows: allRows, tab, setTab, s
       </div>
       <div className="px-3 py-1.5 border-t border-line text-2xs text-ink-3 flex justify-between gap-2">
         <span>מציג <Num>{scanning ? 0 : rows.length}</Num> מתוך <Num>{allRows.length}</Num> חלקות{allRows.length > rows.length && <button onClick={() => setLimit(l => l + 150)} className="ms-2 font-semibold text-accent hover:underline">הצגת עוד 150</button>}</span>
-        <span className="hidden sm:inline">ציון AI = יחס זכויות לא מנוצלות · שלב תכנוני · הנחה מהשוק · דגלי טאבו</span>
+        <span className="hidden lg:inline">ציון סינון = זכויות לא מנוצלות · סימני יזם ציבוריים · מודעה שהוזנה · בעלות. ״עסקה״ רק אחרי נסח.</span>
+        <button onClick={onOpenOrder} className="shrink-0 font-semibold text-accent hover:underline inline-flex items-center gap-1"><Icon name="key" className="w-3.5 h-3.5" />רשימה להזמנת נסחים (<Num>{allRows.filter(p => p.stage === 'order').length}</Num>)</button>
       </div>
     </Card>
   );
@@ -2266,6 +2313,16 @@ function AboutModal({ onClose, onOpenDev }) {
             'לזהות מיקום שעוד לא מתומחר: בניינים ליד תחנות של הקו הסגול, הירוק או המטרו, לפני שהקו נפתח.',
             'לגלות זכויות שקל לפספס: שחזור מרתף, בונוס גג, סף 500 מ״ר ואיחוד חלקות.'
           ], '#10B981')}
+        </section>
+
+        <section className="grid gap-2">
+          <H>מתי בניין הוא עסקה: המשפך</H>
+          <P>בלי נסח טאבו הכלי לא יכול לדעת שבניין הוא עסקה. יזם רושם הערות אזהרה בטאבו ברגע שהדיירים חותמים, הרבה לפני שהוא מגיש משהו לעירייה, ולכן בתקופה הזו הבניין נראה נקי בכל המקורות הציבוריים. הכלי עובד בשלבים:</P>
+          {steps([
+            'סינון ציבורי: בניין בלי היתר, בקשה או סימן ליזם בוועדה, שהרווח היזמי שלו עובר את הסף שהגדרתם (או, לפני שהוזנו פרמטרים, עם תוספת מאומתת של 600 מ״ר ומעלה), מסומן ״מועמד · להזמין נסח״.',
+            'נסח טאבו: מזמינים נסח מרוכז רק למועמדים (כפתור ״רשימה להזמנת נסחים״ מתחת לטבלה) ומעלים אותו בכרטיס הבניין.',
+            'נקי בטאבו: בניין בלי הערות אזהרה של חברה מסומן ״נקי בטאבו״. עליו יוצאים לסיור ופונים לבעלים. בניין שיזם נעל עובר לדילוג.'
+          ])}
         </section>
 
         <section className="grid gap-2">
@@ -2593,7 +2650,7 @@ function Inspector({ onOpenDev, p, onClose, onExport, onSave, saved, onContact, 
           <StatusBadge status={p.status} />
           <span className="text-[11.5px] px-2 py-[3px] rounded-md bg-canvas border border-line text-ink-2 font-semibold">{ROUTES[p.route].label}</span>
           {p.preservation && <span className="inline-flex items-center gap-1 text-[11.5px] px-2 py-[3px] rounded-md bg-act-soft text-act-ink font-semibold"><Icon name="landmark" className="w-3.5 h-3.5" />מבנה לשימור</span>}
-          {p.highConviction && <span className="inline-flex items-center gap-1 text-[11.5px] px-2 py-[3px] rounded-md bg-go text-white font-semibold"><Icon name="spark" className="w-3.5 h-3.5" />ודאות גבוהה</span>}
+          <StageChip p={p} size="md" />{STAGE[p.stage].info && <Info k={STAGE[p.stage].info} />}
         </div>
         <div className="grid grid-cols-3 gap-px bg-line rounded-lg overflow-hidden border border-line mt-3">
           {[
@@ -2688,7 +2745,7 @@ function teaserText(p) {
     `זכויות: ${n0(p.built)} מ״ר בנויים מתוך ${n0(p.allowed)} מותרים (+${n0(p.unused)} מ״ר, ${p.addText})`,
     p.hasListing ? `מודעה: ${ils(p.listPrice)} ל-${p.unitSqm} מ״ר (${ilsK(p.listPpsqm)}/מ״ר${p.discount != null ? `, ${p.discount > 0 ? pct(p.discount) + ' מתחת' : pct(-p.discount) + ' מעל'} לממוצע העסקאות בשכונה` : ''})` : null,
     `תזה: ${p.ai}`,
-    `ציון AI: ${p.score}/100 · פרטי טאבו לדירות: הדגמה עד שיוזן נסח`
+    `ציון סינון: ${p.score}/100 · ${STAGE[p.stage].label}${p.nesach ? ` · נסח מ-${p.nesach.n.date}` : ' · טאבו לא נבדק'}`
   ].filter(Boolean).join('\n');
 }
 
@@ -2704,7 +2761,7 @@ function TeaserModal({ p, onClose, toast }) {
       <div className="rounded-xl border border-line overflow-hidden">
         <div className="bg-ink text-white px-4 py-3 flex items-center justify-between">
           <div><div dir="ltr" className="num text-2xs text-white/60 text-end">ISRA-PROP AI // INVESTMENT TEASER</div><div className="text-[18px] font-extrabold">{p.address}</div><div className="text-2xs text-white/70">גוש <Num>{p.gush}</Num> · חלקה <Num>{p.chelka}</Num> · {p.hood}</div></div>
-          <div className="text-center"><div className="num text-[26px] font-bold leading-none">{p.score}</div><div className="text-2xs text-white/60">ציון AI</div></div>
+          <div className="text-center"><div className="num text-[26px] font-bold leading-none">{p.score}</div><div className="text-2xs text-white/60">ציון סינון</div></div>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-line">
           {[['יתרת זכויות', `+${n0(p.unused)} מ״ר`], ['מסלול', p.addText], ['דירות בבניין', `${p.units}`], ['רווח יזמי', p.econ && p.econ.state === 'ok' ? ils2(p.econ.best.profit) : '—']].map(([l, v]) => (
@@ -2830,7 +2887,7 @@ function App() {
         const res = scanList(t).map(s => genParcelC(s.streetId, s.num, s.idx, s.total, overrides[`${s.streetId}-${s.num}`]));
         setScan(scanList(t)); setScanning(false);
         const hc = res.filter(p => p.highConviction).length;
-        toast(`הסריקה הושלמה: ${res.length} חלקות, ${hc} הזדמנויות בוודאות גבוהה`);
+        toast(`הסריקה הושלמה: ${res.length} חלקות, ${hc} מועמדים`);
       } else setScanStep(i);
     }, 420);
   };
@@ -2839,7 +2896,10 @@ function App() {
 
   const chipFiltered = useMemo(() => parcels.filter(p => chips.every(id => QUICK_FILTERS.find(f => f.id === id).test(p))), [parcels, chips]);
   const rows = useMemo(() => {
-    chipFiltered.forEach(p => { p.econ = econ(p, dev.values); });
+    chipFiltered.forEach(p => {
+      p.econ = econ(p, dev.values);
+      if (!p.nesach && p.stage0 !== 'skip') { p.stage = p.econ.state === 'ok' ? (p.screenOk && p.econ.ok ? 'order' : 'watch') : p.stage0; p.highConviction = p.stage === 'order' || p.stage === 'clean'; }
+    });
     const t = TABS.find(x => x.id === tab);
     const get = SORTS[sort.key].get;
     return chipFiltered.filter(t.test).sort((a, b) => {
@@ -2894,7 +2954,7 @@ function App() {
         </aside>
 
         <section className="min-w-0 xl:min-h-0" aria-label="פיד הזדמנויות">
-          <FeedColumn onOpenDev={() => setDevOpen(true)} compact={!!(selected && isXL)} parcels={chipFiltered} rows={rows} tab={tab} setTab={setTab} sort={sort} setSort={setSort} view={view} setView={setView}
+          <FeedColumn onOpenOrder={() => setModal('order')} onOpenDev={() => setDevOpen(true)} compact={!!(selected && isXL)} parcels={chipFiltered} rows={rows} tab={tab} setTab={setTab} sort={sort} setSort={setSort} view={view} setView={setView}
             selectedId={selected?.id} onSelect={selectP} scanning={scanning} scanStep={scanStep} target={target}
             setHighlightId={setHighlightId} highlightId={highlightId} chipsActive={chips.length > 0} />
         </section>
@@ -2914,6 +2974,7 @@ function App() {
       {aboutOpen && <AboutModal onClose={closeAbout} onOpenDev={() => setDevOpen(true)} />}
       {devOpen && <DevParamsModal dev={dev} onSave={saveDev} onClose={() => setDevOpen(false)} toast={toast} />}
       {rulesFocus !== null && <RulesModal focusId={rulesFocus} onClose={() => setRulesFocus(null)} />}
+      {modal === 'order' && <OrderListModal rows={rows} onClose={() => setModal(null)} toast={toast} />}
       {modal === 'teaser' && selected && <TeaserModal p={selected} onClose={() => setModal(null)} toast={toast} />}
       {modal === 'contact' && selected && <ContactModal p={selected} onClose={() => setModal(null)} toast={toast} />}
 
