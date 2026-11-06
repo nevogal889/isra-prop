@@ -106,6 +106,7 @@ const SRC = {
   p5000: { l: 'תקנון תא/5000 (PDF, נקרא)', u: 'https://gisn.tel-aviv.gov.il/taba_raster/5000.pdf' },
   p3616: { l: 'הוראות תא/3616א (סרוק, נקרא ב-OCR)', u: 'https://gisn.tel-aviv.gov.il/taba_raster/3616A.pdf' },
   p3729: { l: 'הוראות תא/3729א (סרוק, נקרא ב-OCR)', u: 'https://gisn.tel-aviv.gov.il/taba_raster/3729A.pdf' },
+  p3729b: { l: 'הוראות תא/3729ב (PDF, נקרא)', u: 'https://gisn.tel-aviv.gov.il/taba_raster/3729B.pdf' },
   p4562: { l: 'הוראות תא/4562 אבן גבירול (PDF, נקרא)', u: 'https://gisn.tel-aviv.gov.il/taba_raster/4562.pdf' },
   r3docs: { l: 'מסמכי תא/3616א באתר העירייה', u: 'https://gisn.tel-aviv.gov.il/tabaot/docs.aspx?mode=internet&id_taba=5851' },
   r3notice: { l: 'עיריית ת״א: הודעה על תיקון טעות סופר, רובע 3', u: 'https://www.tel-aviv.gov.il/Transparency/DocLib3/%D7%94%D7%95%D7%93%D7%A2%D7%94%20%D7%91%D7%93%D7%91%D7%A8%20%D7%AA%D7%99%D7%A7%D7%95%D7%9F%20%D7%98%D7%A2%D7%95%D7%AA%20%D7%A1%D7%95%D7%A4%D7%A8%20%D7%AA%D7%95%D7%9B%D7%A0%D7%99%D7%AA%20%D7%A8%D7%95%D7%91%D7%A2%203.pdf' },
@@ -156,7 +157,8 @@ const RULES = [
   { id: 'r4-plan', layer: 2, short: 'תא/3729א', title: 'תכנית רובע 4 בתוקף', value: 'בין בני דן לשאול המלך, ובין אבן גבירול לנמיר ואיילון. לא כולל החלקות לאורך אבן גבירול, את המע״ר הצפוני, את מתחם 2000 ואת שכונת צמרת. לא חלה על מבנים לשימור.', when: 'רובע 4', strength: 'vested', conf: 'high', src: ['p3729'] },
   { id: 'r4-new', layer: 2, short: 'תא/3729א §2.2א', title: 'רובע 4, בנייה חדשה', value: 'רחובות ראשיים (נמיר, פנקס, ז׳בוטינסקי, ויצמן): 8 קומות + גג חלקי. ארלוזורוב: 7. רחובות לא ראשיים מחוץ להכרזה: 6 + שתי קומות גג חלקיות. בתכניות לבנייה נמוכה (117, 122, 196, 398, 478): 3–4 + גג. באזור ההכרזה (דוד המלך, דובנוב, שאול המלך): 6 + גג, וחריגה היא סטייה ניכרת.', when: 'הריסה ובנייה', strength: 'vested', conf: 'high', src: ['p3729'] },
   { id: 'r4-add', layer: 2, short: 'תא/3729א §2.2ב', title: 'רובע 4, תוספת', value: 'היתר לפני 1.1.1980. רחוב ראשי: השלמה עד 8 קומות + גג. רחוב לא ראשי, בניין עד 6 קומות: +1 + גג. 7 קומות ומעלה: +2 + גג מחוץ להכרזה, גג חלקי בלבד בהכרזה. בתכניות לבנייה נמוכה, בניין של 2 קומות: +165% משטח הגג. אחרי 1980: חדרי יציאה לגג בלבד.', when: 'תוספת', strength: 'vested', conf: 'high', src: ['p3729'] },
-  { id: 'r4b', layer: 2, short: 'תא/3729ב', title: 'תיקון הוראות לבנייה נמוכה ברובע 4', value: 'בתוקף מ-18.5.2026. משנה את ההוראות בתכניות הבנייה הנמוכה (117, 122, 196, 398, 478). התקנון לא נקרא, ולכן המנוע לא מחשב את אזורים אלה.', when: 'רובע 4, בנייה נמוכה', strength: 'vested', conf: 'low', src: ['gis'] },
+  { id: 'r4-low', layer: 2, short: 'תא/3729א §2.2א(3), §2.2ב(1)ה', title: 'רובע 4, תכניות לבנייה נמוכה (שיכונים)', value: 'בתחום תכניות 117, 122, 196, 398 ו-478. בנייה חדשה במגרש לבניין משותף: עד 3 או 4 קומות + גג חלקי (כולל קרקע), לפי מיקום המגרש בתשריט. המנוע מאמת 3 ומציג 4 בטווח. מגרש קוטג׳: רק חדר יציאה לגג או עליית גג. תוספת (היתר לפני 1980): רק בבניין משותף בן 2 קומות (צמוד קרקע או על עמודים), עד 165% משטח הגג הקיים, בקומה אחת + גג חלקי.', when: 'רובע 4, בנייה נמוכה', strength: 'vested', conf: 'high', src: ['p3729'] },
+  { id: 'r4b', layer: 2, short: 'תא/3729ב', title: 'תיקון הוראות לבנייה נמוכה ברובע 4', value: 'בתוקף מ-18.5.2026. בבנייה חדשה: תוספת 6% משטח המגרש בקוטג׳ים בתחום 196 (שיכון הקצינים) ובתחום 398 באזורי מגורים א2 ו-ב2. בבניינים בקיר משותף: מימוש רק בבנייה משותפת בעת ובעונה אחת, למעט בתחום 117, 122 ו-478, שם מותר מימוש נפרד עד 3 קומות + גג חלקי. מסדירה גם את חלקות 544 ו-574 (תכנית 398, אזור ב2).', when: 'רובע 4, בנייה נמוכה', strength: 'vested', conf: 'high', src: ['p3729b'] },
   // Ibn Gabirol
   { id: 'ig-plan', layer: 2, short: 'תא/4562', title: 'תכנית אבן גבירול', value: 'בתוקף מ-12.12.2023 (שכבת התכניות העירונית). החלקות לאורך אבן גבירול הוצאו מרובעים 3–4. בנייה חדשה: עד 9 קומות מחוץ לאזור ההכרזה, עד 7 בתוכו. תוספת (הסעיף חל באזור ההכרזה בלבד): +1 קומה לפי הקונטור + גג חלקי, עד 5 קומות + חלקית. קומה מסחרית וקולונדה חובה. תכסית מרתף עד 85%.', when: 'אבן גבירול', strength: 'vested', conf: 'medium', src: ['p4562', 'gis'] },
   // Rova 5-6 (not yet read)
@@ -220,6 +222,7 @@ function computeRights(x) {
   const roofExisting = x.roofBuilt ? Math.round(x.typ * 0.4) : 0;
   const existing = Math.round(x.typ * resFloors + (x.pilotis ? x.typ * 0.15 : 0)) + roofExisting;
   const decl = x.declared, r34 = x.rova === '3' || x.rova === '4';
+  const low = x.rova === '4' && !!x.low;
 
   // Layer 1: TA/5000 ceiling (§3.2.4; above-ground area only)
   const maxFar = x.lotArea < 500 ? 2.5 : x.lotArea <= 1500 ? 3.0 : 4.0;
@@ -258,9 +261,10 @@ function computeRights(x) {
   const flo = n => `${n} ${n === 1 ? 'קומה' : 'קומות'}`;
   if (x.preservation === 'strict') { add.available = false; add.reason = 'מבנה לשימור בהגבלות מחמירות: אין תוספת, הזכויות מועברות למגרש אחר.'; add.rules = ['p2650']; }
   else if (!pre80) { add.available = false; add.reason = 'היתר אחרי 1.1.1980: לפי תכנית הרובע רק חדרי יציאה לגג.'; add.rules = [planRule, x.rova === '4' ? 'r4-add' : 'r3-add-outside']; }
+  else if (low && (x.cottage || resFloors !== 2)) { add.available = false; add.reason = x.cottage ? `קוטג׳ בתכנית ${x.low} לבנייה נמוכה: רק חדר יציאה לגג או עליית גג.` : `בתכנית ${x.low} לבנייה נמוכה התוספת מותרת רק לבניין משותף בן 2 קומות. לבניין הזה אין מסלול תוספת בתכנית הרובע.`; add.rules = ['r4-low', 'r4-add']; }
   else if (x.rova === 'ig' && !decl) { add.available = false; add.reason = 'בתא/4562 סעיף התוספת חל באזור ההכרזה בלבד. מחוץ לו לא נמצא מסלול תוספת (דורש בדיקה).'; add.rules = ['ig-plan']; }
   else {
-    let floorsAdd = 0, bonus = false;
+    let floorsAdd = 0, bonus = false, lowAdd = false;
     if (x.preservation === 'regular') { floorsAdd = 1; add.rules = ['p2650']; }
     else if (x.rova === '3') {
       if (x.main) { const target = decl ? (x.floors <= 2 ? 5 : 6) : (x.floors <= 2 ? 5 : 7); floorsAdd = Math.max(0, target - x.floors); }
@@ -268,6 +272,8 @@ function computeRights(x) {
       else if (x.roofBuilt && x.floors < 7) bonus = true;
       else floorsAdd = x.floors >= 7 ? 2 : x.floors >= 2 ? 1 : 0;
       add.rules.push(decl ? 'r3-add-declared' : 'r3-add-outside', 'r3-add-area');
+    } else if (low) {
+      lowAdd = true; add.rules.push('r4-low');
     } else if (x.rova === '4') {
       floorsAdd = x.main ? Math.max(0, 8 - x.floors) : x.floors <= 6 ? 1 : (decl ? 0 : 2);
       add.rules.push('r4-add', 'r3-add-area');
@@ -277,7 +283,10 @@ function computeRights(x) {
     } else if (x.rova === 'ig') {
       floorsAdd = x.floors >= 5 ? 0 : 1;
     }
-    if (bonus) {
+    if (lowAdd) {
+      add.parts.push({ label: 'תוספת 165% משטח הגג הקיים (קומה + גג חלקי)', sqm: Math.round(1.65 * x.typ) });
+      add.short = '+165% משטח הגג';
+    } else if (bonus) {
       add.parts.push({ label: 'השלמת הבנייה הקיימת על הגג לקומה מלאה', sqm: Math.max(0, x.typ - roofExisting) });
       add.parts.push({ label: '+1 קומה מלאה נוספת', sqm: x.typ });
       add.rules.push('r3-roofbonus');
@@ -286,10 +295,9 @@ function computeRights(x) {
       if (floorsAdd) add.parts.push({ label: `+${flo(floorsAdd)} לפי קונטור הגג`, sqm: floorsAdd * x.typ });
       add.short = floorsAdd ? `+${flo(floorsAdd)} + גג` : '+ גג חלקי';
     }
-    add.parts.push({ label: cap65 ? 'קומת גג חלקית (עד 65%)' : 'קומת גג בין הנסיגות', sqm: roofAdd });
-    add.rules.push(roofRule);
+    if (!lowAdd) { add.parts.push({ label: cap65 ? 'קומת גג חלקית (עד 65%)' : 'קומת גג בין הנסיגות', sqm: roofAdd }); add.rules.push(roofRule); }
     if (x.roofBuilt && decl && x.rova === '3') add.parts.push({ label: 'בנייה קיימת על הגג נכללת בתוספת (בהכרזה)', sqm: -roofExisting });
-    if (x.pilotis && r34 && x.preservation === 'none') { add.parts.push({ label: 'סגירת קומת עמודים (הערכה, בניכוי רצועה מפולשת)', sqm: Math.round(x.typ * 0.7) }); add.rules.push('b-pilotis'); }
+    if (x.pilotis && r34 && x.preservation === 'none' && !lowAdd) { add.parts.push({ label: 'סגירת קומת עמודים (הערכה, בניכוי רצועה מפולשת)', sqm: Math.round(x.typ * 0.7) }); add.rules.push('b-pilotis'); }
   }
   add.area = add.parts.reduce((a, p) => a + p.sqm, 0);
   if (r56 && add.available) {
@@ -303,10 +311,13 @@ function computeRights(x) {
 
   // Layer 2b: demolish and rebuild
   const reb = { id: 'rebuild', label: 'הריסה ובנייה מחדש', available: true, rules: [planRule], parts: [] };
+  let lowHi = 0;
   if (x.preservation !== 'none') { reb.available = false; reb.reason = 'מבנה לשימור: אין הריסה, ותכניות הרובע לא חלות עליו.'; reb.rules = ['p2650']; }
+  else if (low && x.cottage) { reb.available = false; reb.reason = `כנראה קוטג׳ בתכנית ${x.low} לבנייה נמוכה (לא בית משותף רשום, תכסית קטנה). בבנייה חדשה מותרים רק חדר יציאה לגג או עליית גג${x.low === '196' || x.low === '398' ? ', ולפי 3729ב תוספת 6% משטח המגרש' : ''}. לא מסלול יזמי.`; reb.rules = ['r4-low', 'r4b']; }
   else {
     let n, roofs = 1;
     if (x.rova === '3') { n = x.main ? (decl ? 6 : 7) : decl ? (x.lotArea >= 500 ? 6 : 5) : 6; reb.rules.push(decl ? 'r3-new-decl' : 'r3-new-out'); if (decl && !x.main) reb.rules.push('r3-lot'); }
+    else if (low) { n = 3; reb.rules.push('r4-low', 'r4b'); lowHi = 4 * typNew + roofNew; }
     else if (x.rova === '4') { if (x.main) n = 8; else if (decl) n = 6; else { n = 6; roofs = 2; } reb.rules.push('r4-new'); }
     else if (x.rova === 'ig') { n = decl ? 7 : 9; roofs = 0; }
     else { n = x.main ? 5 : (x.lotArea >= 500 ? 6 : 5); reb.rules.push('r56-declared'); }
@@ -370,7 +381,8 @@ function computeRights(x) {
   flags.push({ tone: 'info', rule: 't5500', text: 'תא/5500 מופקדת ותחליף את תא/5000. ייתכנו שינויים בתקרות.' });
 
   const verified = best && !pend && best.conf !== 'low' ? best.total : null;
-  const range = { lo: best && !pend ? best.total : existing, hi: Math.max(totals.discretion, best ? best.total : existing) };
+  if (low) flags.push({ tone: 'warn', rule: 'r4-low', text: x.cottage ? `החלקה בתחום תכנית ${x.low} לבנייה נמוכה, וכנראה קוטג׳. אין מסלול יזמי של הריסה ובנייה או תוספת קומות.` : `החלקה בתחום תכנית ${x.low} לבנייה נמוכה (שיכון): עד 3 או 4 קומות + גג, לפי מיקום המגרש בתשריט 3729א. המנוע מאמת 3 ומציג 4 בטווח.` });
+  const range = { lo: best && !pend ? best.total : existing, hi: Math.max(totals.discretion, best ? best.total : existing, lowHi) };
   return { existing, ceiling, typNew, add, reb, sAdd, sReb, best, adjustments, opps, totals, flags, pend, verified, range };
 }
 
@@ -510,7 +522,8 @@ function baseInputsReal(streetId, num) {
     floors: R.fl ? R.fl + 1 : mb.floors, pilotis: !!R.pil,
     basement: 0, basementUnit: false, roofBuilt: false,
     permitYear: R.yr || mb.permitYear, year: R.yr || mb.year,
-    declared: !!R.decl,
+    declared: !!R.decl, low: R.area === '4' && R.low ? R.low : null,
+    cottage: R.area === '4' && !!R.low && !(R.own && R.own.u > 1) && (R.ft || 999) < 160 && (R.fl || 0) + 1 <= 3,
     preservation: R.pres === 2 ? 'strict' : R.pres === 1 ? 'regular' : 'none',
     perFloor: Math.max(1, Math.min(4, Math.round(typ / 95)))
   };
@@ -773,7 +786,7 @@ const INFO = {
   col_addr: 'כל שורה היא בניין שלם על חלקה אחת (גוש/חלקה), לא דירה בודדת. מוצגים: כתובת ראשית מה-GIS, שנת בנייה, קומות (ק+N פירושו קרקע ועוד N) ומספר הדירות בבניין. מספר בלי סימן: תתי-חלקות רשומות בטאבו (נתון אמיתי). עם ~: הערכה לפי קומות ותכסית, כי הבית המשותף לא רשום.',
   col_status: 'שורה עליונה: סטטוס הפעילות בחלקה. ירוק, יעד נקי: אין היתר ואין בקשה. תכלת, סימן מוקדם: הופיע בפרוטוקול ועדה או בתכנית בהכנה, בלי היתר. כתום, בקשה פתוחה: בקשה להיתר בתהליך. אפור, פרויקט פעיל: היתר התחדשות מ-2018 או בניין חדש, ולכן לדלג. שורה תחתונה: התכנית שחלה על החלקה. המקרא המלא מופיע גם מעל הטבלה.',
   v_pend: 'תכנית רובעים 5–6 (תא/מק/4320) אושרה בוועדה המחוזית באוקטובר 2026 ועוד לא פורסמה ברשומות. תכנית נכנסת לתוקף רק ביום הפרסום, ולכן עדיין אין זכות שאפשר להוציא עליה היתר. בעמודה ״טווח אפשרי״ רואים מה התכנית תאפשר אחרי הפרסום. זה החלון שלפני שהשוק מתמחר אותה.',
-  v_low: 'יש תוספת, אבל אחד הכללים שעליהם היא נשענת עוד לא אומת מול התקנון. למשל אזור בנייה נמוכה ברובע 4. בבוחן הנכס הכללים האלה מסומנים באדום.',
+  v_low: 'יש תוספת, אבל אחד הכללים שעליהם היא נשענת עוד לא אומת מול התקנון. בבוחן הנכס הכללים האלה מסומנים באדום.',
   v_none: 'לפי התכנית החלה אין תוספת שטח. למשל מבנה לשימור בהגבלות מחמירות, היתר מאחרי 1980 (רק חדרי יציאה לגג), או בניין שכבר ניצל את הזכויות.',
   col_verified: 'תוספת השטח לפי תכנית בתוקף ונתונים אמיתיים, במסלול הטוב ביותר: תוספת או הריסה ובנייה. ״—״ מופיע כשאין מספר שאפשר לסמוך עליו, והסיבה כתובה מתחת: ״תכנית טרם בתוקף״ (אושרה ולא פורסמה), ״דורש אימות״ (כלל לא אומת) או ״אין תוספת״. לכל סיבה יש i משלה.',
   col_range: 'מהזכויות המוקנות ועד מה שאפשר להשיג עם הקלות ושיקול דעת הוועדה. זו הערכה ולא זכות. בפס: אפור הוא הקיים, כחול המוקנה, ומקווקו ההערכה.',
@@ -2007,7 +2020,7 @@ function AboutModal({ onClose, onOpenDev }) {
           </div>
           <div className="rounded-lg border border-line p-3 grid gap-1.5">
             <div className="text-[12.5px] font-bold text-act-ink">עדיין לא, או הדגמה</div>
-            {bullets(['הערות אזהרה, משכנתאות ושמות בעלים: דורשים נסח טאבו', 'מחירי מודעות: הדגמה', 'מרתפים ובנייה על הגג: הזנה ידנית', 'אזורי בנייה נמוכה ברובע 4: לא ממודלים'], '#F59E0B')}
+            {bullets(['הערות אזהרה, משכנתאות ושמות בעלים: דורשים נסח טאבו', 'מחירי מודעות: הדגמה', 'מרתפים ובנייה על הגג: הזנה ידנית'], '#F59E0B')}
           </div>
         </section>
 
