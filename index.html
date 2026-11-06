@@ -236,12 +236,18 @@ function computeRights(x) {
   const front = 4;
   const depthLot = x.lotArea / x.frontage;
   const wNew = Math.max(0, x.frontage - 2 * side), dNew = Math.max(0, depthLot - front - rear);
-  const typNew = Math.round((r56 || x.rova === '3') && big ? Math.min(wNew * dNew, 0.55 * x.lotArea) : wNew * dNew);
+  // Floor plate of a new building. Real lot shape from the cadastre when available (tools/lines_geom.py), else a rectangle (frontage x lot/frontage).
+  // The front line is an assumption (4 m): both rova plans defer it to the older plans of each street, which are not published as data.
+  const g = x.geo && x.geo.bn && x.geo.bn[1] ? x.geo : null;
+  const plate = i => g ? g.bn[i] : Math.max(0, x.frontage - 2 * side) * Math.max(0, depthLot - [3, 4, 5][i] - rear);
+  const cap55 = v => Math.round((r56 || x.rova === '3') && big ? Math.min(v, 0.55 * x.lotArea) : v);
+  const typNew = cap55(plate(1)), typNewHi = cap55(plate(0)), typNewLo = cap55(plate(2));
+  const capped55 = (r56 || x.rova === '3') && big && plate(1) > 0.55 * x.lotArea;
   const wEx = Math.max(6, Math.min(wNew || 6, x.typ / Math.max(8, dNew || 8)));
   const dEx = x.typ / wEx;
   const cap65 = decl || x.rova === '5-6' || x.rova === 'ig';
   // Roof floor: new building 3 m front + 2 m rear setback; addition 3 m front, rest per contour. 65% cap only in the declared area.
-  const roofNewSet = Math.round(wNew * Math.max(0, dNew - 5));
+  const roofNewSet = Math.round(g ? g.br[1] : wNew * Math.max(0, dNew - 5));
   const roofNew = Math.round(cap65 ? Math.min(0.65 * typNew, roofNewSet) : roofNewSet);
   const roofAddSet = Math.round(wEx * Math.max(0, dEx - 3));
   const roofAdd = Math.round(cap65 ? Math.min(0.65 * x.typ, roofAddSet) : roofAddSet);
@@ -383,7 +389,8 @@ function computeRights(x) {
   const verified = best && !pend && best.conf !== 'low' ? best.total : null;
   if (low) flags.push({ tone: 'warn', rule: 'r4-low', text: x.cottage ? `החלקה בתחום תכנית ${x.low} לבנייה נמוכה, וכנראה קוטג׳. אין מסלול יזמי של הריסה ובנייה או תוספת קומות.` : `החלקה בתחום תכנית ${x.low} לבנייה נמוכה (שיכון): עד 3 או 4 קומות + גג, לפי מיקום המגרש בתשריט 3729א. המנוע מאמת 3 ומציג 4 בטווח.` });
   const range = { lo: best && !pend ? best.total : existing, hi: Math.max(totals.discretion, best ? best.total : existing, lowHi) };
-  return { existing, ceiling, typNew, add, reb, sAdd, sReb, best, adjustments, opps, totals, flags, pend, verified, range };
+  const ex = { geo: g ? 'real' : 'rect', side, rear, front: 4, wNew: Math.round(wNew * 10) / 10, dNew: Math.round(dNew * 10) / 10, depthLot: Math.round(depthLot * 10) / 10, typNewHi, typNewLo, capped55, roofNew, resFloors, roofExisting, fs: g ? g.fs : null };
+  return { existing, ceiling, typNew, add, reb, sAdd, sReb, best, adjustments, opps, totals, flags, pend, verified, range, ex };
 }
 
 /* =========================================================================
@@ -534,6 +541,7 @@ function baseInputsReal(streetId, num) {
     floors: R.fl ? R.fl + 1 : mb.floors, pilotis: !!R.pil,
     basement: 0, basementUnit: false, roofBuilt: false,
     permitYear: R.yr || mb.permitYear, year: R.yr || mb.year,
+    geo: R.bn && R.bn[1] ? { bn: R.bn, br: R.br, fs: R.fs } : null,
     declared: !!R.decl, low: R.area === '4' && R.low ? R.low : null,
     cottage: R.area === '4' && !!R.low && !(R.own && R.own.u > 1) && (R.ft || 999) < 160 && (R.fl || 0) + 1 <= 3,
     preservation: R.pres === 2 ? 'strict' : R.pres === 1 ? 'regular' : 'none',
@@ -555,6 +563,7 @@ function genParcel(streetId, num, idx, total, ov) {
   const NS = R0 ? NESACH[`${R0.g}-${R0.c}`] || null : null;
   if (NS && NS.s.basementArea > 0) { base.basement = Math.round(NS.s.basementArea); base.basementUnit = true; }
   const inp = { ...base, ...(ov || {}) };
+  if (ov && (ov.lotArea != null || ov.frontage != null)) inp.geo = null; // user changed the lot: fall back to the rectangle model
   const resFloors = Math.max(1, inp.floors - (inp.pilotis ? 1 : 0));
   const RR0 = realRec(streetId, num);
   const own = RR0 && RR0.own ? RR0.own : null;
@@ -925,6 +934,7 @@ const Icon = ({ name, className = 'w-4 h-4', stroke = 1.8 }) => (
    4b. INFO TIPS
    ========================================================================= */
 const INFO = {
+  explain: 'אותו חישוב כמו בשכבות שמתחת, בשפה פשוטה. ליד כל מספר כתוב מאיפה הוא: מהמפה העירונית, מהתכנית, הנחה של הכלי, או תוצאה של חישוב. הנחה היא המקום שבו המספר יכול לטעות.',
   st_order: 'שלב 1 במשפך: לפי הנתונים הציבוריים הבניין שווה בדיקה. אין היתר, בקשה או סימן ליזם, ובנוסף: אם הזנתם פרמטרים יזמיים, הרווח עובר את הסף המינימלי שלכם; אם לא, יש תוספת מאומתת של 600 מ״ר ומעלה (כ-6 דירות חדשות). הטאבו עוד לא נבדק: יזם שהחתים דיירים ולא הגיש כלום לא מופיע בשום מקור ציבורי. הצעד הבא: להזמין נסח מרוכז ולהעלות אותו בסעיף הטאבו.',
   st_clean: 'שלב 2 במשפך: הועלה נסח, ואין עליו הערות אזהרה לטובת חברה. זה הבניין שעליו יוצאים לסיור ופונים לבעלים. עדיין כדאי לבדוק את תיק הבניין בעירייה ולקבל חוות דעת שמאי ועורך דין.',
   st_contested: 'הועלה נסח, ויש בו הערות אזהרה לטובת חברה על פחות מחצי מהדירות. יזם התחיל להחתים ועוד אין לו רוב. אפשר להתחרות, אבל הוא מקדים אתכם.',
@@ -949,12 +959,12 @@ const INFO = {
   legend: 'יעד נקי: אין היתר ואין בקשה. סימן מוקדם: הופיע בפרוטוקול ועדה או בתכנית בהכנה, בלי היתר. בקשה פתוחה: בקשה להיתר בתהליך. פרויקט פעיל: היתר התחדשות מ-2018 או בניין שנבנה מ-2008, ולכן לדלג.',
   density: 'סיכום של כל החלקות בסריקה הנוכחית, לא רק של אלה שמוצגות בטבלה.',
   t_total: 'מספר החלקות הבנויות בתחום הסריקה.',
-  t_hc: 'בניינים בלי סימן ציבורי ליזם שעוברים את סף הרווח שלכם, או בלי פרמטרים תוספת מאומתת של 600 מ״ר ומעלה (״להזמין נסח״), ובניינים שהועלה להם נסח בלי הערות אזהרה של חברה (״נקי בטאבו״).',
+  t_hc: 'בניינים בלי סימן ציבורי ליזם שעוברים את סף הרווח שלכם, או בלי פרמטרים תוספת של 600 מ״ר ומעלה לפי התכנית (״להזמין נסח״), ובניינים שהועלה להם נסח בלי הערות אזהרה של חברה (״נקי בטאבו״).',
   t_signed: 'חלקות עם היתר התחדשות מ-2018 ואילך או בניין שנבנה מ-2008. כנראה כבר תפוסות.',
   t_ratio: 'ממוצע החלק מהזכויות המותרות שעוד לא נבנה. בשורה התחתונה: סך המ״ר הפנויים בחלקות שאין בהן פרויקט פעיל.',
   breakdown: 'כמה חלקות יש בכל סטטוס.',
   feed: 'כל החלקות בסריקה, מדורגות לפי המיון שבחרתם. לחיצה על שורה פותחת את בוחן הנכס. מוצגות 150 בכל פעם.',
-  tabs: 'כל הבניינים. מועמדים: ״להזמין נסח״ (בלי סימן ציבורי ליזם, ורווח מעל הסף שלכם או תוספת מאומתת של 600 מ״ר ומעלה) ו״נקי בטאבו״ (נסח הועלה ואין הערות אזהרה של חברה). דילוג: פרויקטים פעילים או בניינים שיזם נעל בטאבו.',
+  tabs: 'כל הבניינים. מועמדים: ״להזמין נסח״ (בלי סימן ציבורי ליזם, ורווח מעל הסף שלכם או תוספת של 600 מ״ר ומעלה לפי התכנית) ו״נקי בטאבו״ (נסח הועלה ואין הערות אזהרה של חברה). דילוג: פרויקטים פעילים או בניינים שיזם נעל בטאבו.',
   col_score: 'ציון סינון מ-0 עד 100. נוסחה ולא בינה מלאכותית: עד 38 נקודות על זכויות לא מנוצלות, עד 34 על הסטטוס (אין סימן ליזם או סימן מוקדם בוועדה), עד 18 על מודעה שהזנתם מתחת לשכונה, ותיקונים על שימור, בעלות לא פרטית, מספר בעלים ותכנית שטרם בתוקף. הוא אומר איזה בניין שווה בדיקה, לא שהבניין הוא עסקה: יזם שהחתים דיירים ועוד לא הגיש כלום נראה רק בנסח הטאבו.',
   col_addr: 'כל שורה היא בניין שלם על חלקה אחת (גוש/חלקה), לא דירה בודדת. מוצגים: כתובת ראשית מה-GIS, שנת בנייה, קומות (ק+N פירושו קרקע ועוד N) ומספר הדירות בבניין. מספר בלי סימן: תתי-חלקות רשומות בטאבו (נתון אמיתי). עם ~: הערכה לפי קומות ותכסית, כי הבית המשותף לא רשום.',
   col_status: 'שורה עליונה: סטטוס הפעילות בחלקה. ירוק, יעד נקי: אין היתר ואין בקשה. תכלת, סימן מוקדם: הופיע בפרוטוקול ועדה או בתכנית בהכנה, בלי היתר. כתום, בקשה פתוחה: בקשה להיתר בתהליך. אפור, פרויקט פעיל: היתר התחדשות מ-2018 או בניין חדש, ולכן לדלג. שורה תחתונה: התכנית שחלה על החלקה. המקרא המלא מופיע גם מעל הטבלה.',
@@ -965,7 +975,7 @@ const INFO = {
   col_range: 'מהזכויות המוקנות ועד מה שאפשר להשיג עם הקלות ושיקול דעת הוועדה. זו הערכה ולא זכות. בפס: אפור הוא הקיים, כחול המוקנה, ומקווקו ההערכה.',
   col_profit: 'רווח יזמי במסלול הכי רווחי, בשקלים ובאחוז מסך העלויות, לפי הפרמטרים היזמיים. ירוק: עובר את הרווח המינימלי שהגדרתם. אדום: לא עובר.',
   insp: 'ניתוח של הבניין כולו, לא של דירה בודדת: זכויות, כלכלה, בעלות, סביבה ופעילות תכנונית. אפשר לערוך את שדות הקלט, והחישוב מתעדכן.',
-  k_verified: 'תוספת שטח מוקנית לפי תכנית בתוקף, והטווח עד מה שאפשר עם הקלות ושיקול דעת.',
+  k_verified: 'התוספת שהתכנית שבתוקף מתירה, לפי כללי התכנית (קומות, קווי בניין צדדי ואחורי) וצורת המגרש. הקו הקדמי הוא הנחה של 4 מ׳, ולכן זה חישוב ולא אישור רשמי. הטווח מוסיף הקלות ושיקול דעת. ההסבר המלא, צעד אחר צעד, בסעיף ״מנוע זכויות״.',
   k_uplift: 'כמה המודעה שהזנתם זולה או יקרה ממחיר העסקאות הממוצע בשכונה לדירה עם אותו מספר חדרים (נדל״ן.gov.il). מופיע רק אחרי שמזינים מודעה.',
   k_profit: 'רווח יזמי במסלול הכי רווחי, לפי הפרמטרים שהוזנו. הפירוט בסעיף ״כלכלה יזמית״.',
   calc: 'החישוב בשכבות: תקרת תא/5000, התכנית המפורטת שנותנת את הזכויות, הנחיות עיצוב שמקטינות את השטח בפועל, ממצאים ״בין השורות״ ומסלולים חלופיים.',
@@ -1831,7 +1841,7 @@ const TABS = [
 const SORTS = {
   score: { label: 'ציון סינון', get: p => p.score },
   address: { label: 'כתובת', get: p => p.street + String(p.num).padStart(4, '0') },
-  verified: { label: 'זכויות מאומתות', get: p => p.verifiedAdd ?? -1 },
+  verified: { label: 'זכויות לפי התכנית', get: p => p.verifiedAdd ?? -1 },
   unused: { label: 'טווח (עליון)', get: p => p.rangeHi },
   ratio: { label: 'יחס לא מנוצל', get: p => p.unusedRatio },
   uplift: { label: 'מודעה מתחת לשכונה', get: p => p.discount ?? -9 },
@@ -1875,7 +1885,7 @@ function OpportunityTable({ onOpenDev, compact, rows, sort, setSort, selectedId,
             <SortTh info="col_score" k="score" sort={sort} setSort={setSort} className="w-[96px]">ציון סינון</SortTh>
             <SortTh info="col_addr" k="address" sort={sort} setSort={setSort}>בניין · גוש/חלקה</SortTh>
             <th className="px-2.5 py-2 font-semibold text-start whitespace-nowrap">סטטוס · מסלול <Info k="col_status" className="ms-1" /></th>
-            <SortTh info="col_verified" k="verified" sort={sort} setSort={setSort} className="w-[150px]">זכויות מאומתות</SortTh>
+            <SortTh info="col_verified" k="verified" sort={sort} setSort={setSort} className="w-[150px]">זכויות לפי התכנית</SortTh>
             <SortTh info="col_range" k="unused" sort={sort} setSort={setSort} className="w-[160px]">טווח אפשרי (הערכה)</SortTh>
             <SortTh info="col_profit" k="profit" sort={sort} setSort={setSort} className="w-[150px]">רווח יזמי</SortTh>
             {!compact && <th className="px-2.5 py-2"><span className="sr-only">פעולה</span></th>}
@@ -1938,7 +1948,7 @@ function OpportunityCards({ onOpenDev, rows, selectedId, onSelect }) {
             <ScorePill score={p.score} hc={p.highConviction} />
           </div>
           <div className="flex flex-wrap items-center gap-2 mt-2"><StatusBadge status={p.status} size="sm" /><RouteChip route={p.route} preservation={p.preservation} /></div>
-          <div className="mt-2.5 text-2xs text-ink-2 flex justify-between"><span><Num className="font-semibold">{n0(p.built)}</Num> / <Num>{n0(p.allowed)}</Num> מ״ר</span><span className="text-go-ink font-bold">{p.verifiedAdd != null ? <>מאומת <Num>+{n0(p.verifiedAdd)}</Num></> : 'מאומת —'} · טווח <Num>+{n0(p.rangeLo)}–{n0(p.rangeHi)}</Num></span></div>
+          <div className="mt-2.5 text-2xs text-ink-2 flex justify-between"><span><Num className="font-semibold">{n0(p.built)}</Num> / <Num>{n0(p.allowed)}</Num> מ״ר</span><span className="text-go-ink font-bold">{p.verifiedAdd != null ? <>לפי התכנית <Num>+{n0(p.verifiedAdd)}</Num></> : 'לפי התכנית —'} · טווח <Num>+{n0(p.rangeLo)}–{n0(p.rangeHi)}</Num></span></div>
           <div className="mt-1"><RightsBar built={p.built} allowed={p.allowed} /></div>
           <div className="mt-2.5 pt-2.5 border-t border-line-soft"><ProfitCell p={p} onOpenDev={onOpenDev} /></div>
         </button>
@@ -2194,6 +2204,69 @@ function ScenarioRow({ s, best, openRule }) {
 
 const TIER = { relief: 'relief', discretion: 'discretion', ruling: 'ruling', guideline: 'guideline', vested: 'vested' };
 
+function RightsExplain({ p, openRule }) {
+  const c = p.calc, x = p.inputs, e = c.ex, b = c.best;
+  const [open, setOpen] = useState(true);
+  const SRC_T = { plan: ['מהתכנית', 'bg-go-soft text-go-ink'], gis: ['מה-GIS', 'bg-accent-soft text-accent'], est: ['הנחה', 'bg-act-soft text-act-ink'], reg: ['מהטאבו', 'bg-pre-soft text-pre-ink'], calc: ['חישוב', 'bg-canvas text-ink-2'] };
+  const T = ({ t }) => <span className={`inline-block text-[10px] font-bold px-1 rounded align-middle ${SRC_T[t][1]}`}>{SRC_T[t][0]}</span>;
+  const Row = ({ n, title, children }) => (
+    <li className="grid grid-cols-[22px_1fr] gap-2 py-2 border-t border-line-soft first:border-t-0">
+      <span className="w-5 h-5 rounded-full bg-accent text-white text-[11px] font-bold grid place-items-center num mt-px">{n}</span>
+      <div className="min-w-0"><div className="text-[12.5px] font-bold text-ink">{title}</div><div className="text-[12px] text-ink-2 leading-relaxed mt-0.5">{children}</div></div>
+    </li>
+  );
+  const planName = { '3': 'תא/3616א (רובע 3)', '4': x.low ? `תא/3729א (רובע 4) · תכנית ${x.low} לבנייה נמוכה` : 'תא/3729א (רובע 4)', '5-6': 'תא/מק/4320 (רובעים 5–6)', 'ig': 'תא/4562 (אבן גבירול)' }[x.rova];
+  const perM = Math.round((e.typNewHi - e.typNewLo) / 2);
+  const nFl = b && b.id === 'rebuild' ? (b.parts[0] && +String(b.parts[0].label).match(/^\d+/)?.[0]) || 1 : 1;
+  const Scen = ({ s }) => !s.available ? <div className="text-2xs text-ink-3">{s.label}: לא זמין. {s.reason}</div> : (
+    <div className="rounded-md bg-canvas border border-line px-2 py-1.5 mt-1">
+      <div className="text-2xs font-bold text-ink mb-0.5">{s.label}{b === s && <span className="ms-1 text-go-ink">· המסלול שנבחר (הכי הרבה שטח)</span>}</div>
+      {s.parts.map((q, i) => <div key={i} className="flex justify-between gap-2 text-2xs"><span>{q.label}</span><Num className={q.sqm < 0 ? 'text-stop' : 'text-ink'}>{q.sqm > 0 ? '+' : ''}{n0(q.sqm)}</Num></div>)}
+      <div className="flex justify-between gap-2 text-2xs font-bold border-t border-line mt-0.5 pt-0.5"><span>{s.id === 'add' ? `קיים ${n0(c.existing)} + תוספת` : 'סה״כ בבניין החדש'}</span><Num>{n0(s.total)} מ״ר</Num></div>
+    </div>
+  );
+  return (
+    <div className="mb-3 rounded-xl border border-accent/30 bg-accent-soft/30">
+      <button onClick={() => setOpen(o => !o)} className="w-full flex items-center justify-between gap-2 px-3 py-2 text-start">
+        <span className="text-[13px] font-bold text-ink">איך חושב המספר, בשפה פשוטה <Info k="explain" /></span>
+        <Icon name="chevron" className={`w-4 h-4 text-ink-3 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && <div className="px-3 pb-3">
+        <div className="text-2xs text-ink-3 mb-1 flex flex-wrap gap-1 items-center">מקור כל מספר: <T t="gis" /> נתון מהמפה העירונית · <T t="plan" /> כתוב בתכנית · <T t="est" /> הנחה של הכלי · <T t="calc" /> תוצאה של חישוב</div>
+        <ol>
+          <Row n="1" title="מה בנוי היום">
+            תכסית <Num>{n0(x.typ)}</Num> מ״ר <T t="gis" /> × <Num>{e.resFloors}</Num> קומות מגורים <T t="gis" />{x.pilotis ? <> + קומת עמודים (15% מהתכסית) <T t="est" /></> : null}{e.roofExisting ? <> + בנייה על הגג <Num>{n0(e.roofExisting)}</Num> <T t="est" /></> : null} = <b><Num>{n0(c.existing)}</Num> מ״ר</b> <T t="calc" />
+          </Row>
+          <Row n="2" title="איזו תכנית חלה, ומה היא מתירה">
+            {planName} <T t="plan" />. הזכויות בתכנית הזו לא כתובות במ״ר אלא כ״מעטפת״: כמה קומות, וכמה רחוק מגבולות המגרש. את המ״ר מחשבים מזה. {c.reb.available ? <>בבנייה חדשה: <b>{c.reb.short.replace(' (הריסה)', '')}</b>.</> : null} {c.add.available ? <>בתוספת על הקיים: <b>{c.add.short}</b>.</> : null}
+            <Chips ids={[...new Set([...(c.reb.rules || []), ...(c.add.rules || [])].filter(r => /^r|^ig|^t5000-rova/.test(r)))]} openRule={openRule} />
+          </Row>
+          {c.reb.available && <Row n="3" title="כמה שטח יש בכל קומה של בניין חדש">
+            {e.geo === 'real'
+              ? <>צורת המגרש האמיתית מהמפה (<Num>{n0(x.lotArea)}</Num> מ״ר) <T t="gis" />, פחות רצועה לאורך הרחוב: קו בניין קדמי <Num>4</Num> מ׳ <T t="est" />, ולאורך השכנים: צדדי <Num>{e.side}</Num> מ׳ ואחורי <Num>{e.rear}</Num> מ׳ <T t="plan" />. מה שנשאר: <b><Num>{n0(c.typNew)}</Num> מ״ר לקומה</b> <T t="calc" />.</>
+              : <>אין צורה מדויקת למגרש, ולכן הוא חושב כמלבן <T t="est" />: רוחב <Num>{x.frontage}</Num> − 2×<Num>{e.side}</Num> = <Num>{e.wNew}</Num> מ׳; עומק <Num>{n0(x.lotArea)}</Num>÷<Num>{x.frontage}</Num> = <Num>{e.depthLot}</Num> − <Num>4</Num> − <Num>{e.rear}</Num> = <Num>{e.dNew}</Num> מ׳; <Num>{e.wNew}</Num>×<Num>{e.dNew}</Num> = <b><Num>{n0(c.typNew)}</Num> מ״ר לקומה</b>.</>}
+            {e.capped55 && <> הוגבל ל-55% משטח המגרש (מגרש מעל 750 מ״ר) <T t="plan" />.</>}
+            <div className="text-2xs text-ink-3 mt-1">למה הקו הקדמי הוא הנחה: תכנית הרובע קובעת שהקו הקדמי ״בהתאם לתכניות התקפות״, כלומר לפי התכנית הישנה של כל רחוב, והוא לא מפורסם כנתון. קו של 3 מ׳ נותן <Num>{n0(e.typNewHi)}</Num> מ״ר לקומה, ו-5 מ׳ נותן <Num>{n0(e.typNewLo)}</Num>. כל מטר משנה כ-<Num>{n0(perM)}</Num> מ״ר בקומה, כ-<Num>{n0(perM * nFl)}</Num> מ״ר בבניין.{e.fs != null && <> הבניין הקיים עומד כ-<Num>{e.fs}</Num> מ׳ מהרחוב <T t="gis" />, אבל זה לא בהכרח הקו המותר.</>}</div>
+          </Row>}
+          <Row n={c.reb.available ? 4 : 3} title="החישוב לכל מסלול">
+            <Scen s={c.reb} /><Scen s={c.add} />
+          </Row>
+          <Row n={c.reb.available ? 5 : 4} title="התוספת">
+            {b ? <><Num>{n0(b.total)}</Num> − <Num>{n0(c.existing)}</Num> קיים = <b><Num>+{n0(b.total - c.existing)}</Num> מ״ר</b>. {p.verifiedAdd != null ? 'זה המספר בעמודה ״זכויות לפי התכנית״.' : c.pend ? 'לא מוצג כזכות כי התכנית אושרה ועוד לא פורסמה (תרחיש).' : 'לא מוצג כזכות כי אחד הכללים עוד לא נבדק מול התקנון.'}</> : 'אין מסלול שמוסיף שטח לבניין הזה.'}
+          </Row>
+          <Row n={c.reb.available ? 6 : 5} title="מה בטווח, ומה לא נכלל">
+            הטווח עד <Num>+{n0(p.rangeHi)}</Num> מוסיף דברים שתלויים בוועדה, כמו הרחבת דירות קיימות עד 25 מ״ר לדירה. לא נכללים: מרפסות (כ-12 מ״ר לדירה חדשה, מעבר לזכויות) ומרתפים.
+          </Row>
+          <Row n={c.reb.available ? 7 : 6} title="בדיקה מול תכנית המתאר העירונית">
+            תא/5000: <Num>{n0(x.lotArea)}</Num> × <Num>{c.ceiling.maxFar.toFixed(1)}</Num> = <Num>{n0(c.ceiling.area)}</Num> מ״ר <T t="plan" />. {b && b.total > c.ceiling.area ? 'תכנית הרובע מתירה יותר, והיא גוברת, ולכן החישוב תקף.' : 'החישוב בתוך התקרה.'}
+          </Row>
+        </ol>
+        <div className="text-2xs text-ink-3 mt-1">האישור הרשמי לבניין מסוים: תיק מידע מהעירייה או בדיקה של אדריכל. הכלי נועד לסנן ולתעדף.</div>
+      </div>}
+    </div>
+  );
+}
+
 function RightsCalculator({ p, onOverride, onReset, openRule }) {
   const c = p.calc;
   const Step = ({ n, title, sub, children, info }) => (
@@ -2207,6 +2280,7 @@ function RightsCalculator({ p, onOverride, onReset, openRule }) {
   );
   return (
     <Section info="calc" eyebrow="מנוע זכויות" title="חישוב זכויות בשכבות" icon="layers">
+      <RightsExplain p={p} openRule={openRule} />
       <div className="flex items-center justify-between mb-1.5">
         <span className="eyebrow inline-flex items-center gap-1">נתוני קלט · ניתנים לעריכה <Info k="inputs" /></span>
         {p.overridden.length > 0 && <button onClick={onReset} className="text-2xs font-semibold text-accent hover:underline">איפוס ({p.overridden.length})</button>}
@@ -2294,7 +2368,7 @@ function AboutModal({ onClose, onOpenDev }) {
           {steps([
             'כל שורה בכלי היא בניין שלם (חלקה אחת בטאבו), לא דירה בודדת. עבור יזם הבניין הוא העסקה, כי מחתימים את כל הבעלים.',
             'סורק את כל 7,820 החלקות הבנויות ברובעים 3–6 ובאבן גבירול, עם נתונים אמיתיים מה-GIS של העירייה: מגרש, מבנה, שימור, היתרים ותכניות.',
-            'מחשב לכל בניין כמה מותר לבנות לפי התכניות שבתוקף (תא/5000, תכניות הרובע, אבן גבירול, 4320), ומפריד בין מה שמאומת לבין הערכה. לכל כלל יש מקור.',
+            'מחשב לכל בניין כמה מותר לבנות לפי התכניות שבתוקף (תא/5000, תכניות הרובע, אבן גבירול, 4320), ומפריד בין מה שנובע ישירות מהתכנית לבין הערכה. לכל כלל יש מקור.',
             'מסמן מתחרים: בניינים עם היתר, בקשה פעילה או בנייה חדשה עוברים לרשימת הדילוג.',
             'מזהה סימנים מוקדמים: בניין שמופיע בפרוטוקולי הוועדה המקומית או בתכנית בהכנה, לפני שיש לו היתר.',
             'מוסיף בעלות: כמה בעלים צריך להחתים, ואם הבעלות פרטית או של המדינה.',
@@ -2654,7 +2728,7 @@ function Inspector({ onOpenDev, p, onClose, onExport, onSave, saved, onContact, 
         </div>
         <div className="grid grid-cols-3 gap-px bg-line rounded-lg overflow-hidden border border-line mt-3">
           {[
-            { i: 'k_verified', l: 'זכויות מאומתות', v: p.verifiedAdd != null ? <><Num>+{n0(p.verifiedAdd)}</Num><span className="text-[11px] font-semibold"> מ״ר</span></> : '—', s: `טווח +${n0(p.rangeLo)}–${n0(p.rangeHi)} מ״ר`, tone: 'text-go-ink' },
+            { i: 'k_verified', l: 'זכויות לפי התכנית', v: p.verifiedAdd != null ? <><Num>+{n0(p.verifiedAdd)}</Num><span className="text-[11px] font-semibold"> מ״ר</span></> : '—', s: `טווח +${n0(p.rangeLo)}–${n0(p.rangeHi)} מ״ר`, tone: 'text-go-ink' },
             { i: 'k_uplift', l: 'מודעה מול השכונה', v: p.discount != null ? <Num>{p.discount > 0 ? `−${pct(p.discount)}` : `+${pct(-p.discount)}`}</Num> : '—', s: p.hasListing ? (p.discount != null ? 'מול ממוצע עסקאות' : 'אין ממוצע להשוואה') : 'אין מודעה שהוזנה', tone: p.discount > 0.05 ? 'text-go-ink' : p.discount != null && p.discount < -0.05 ? 'text-stop' : 'text-ink-4' },
             p.econ && p.econ.state === 'ok' ? { i: 'k_profit', l: 'רווח יזמי', v: <Num>{ils2(p.econ.best.profit)}</Num>, s: `${pct(p.econ.best.pct, 0)} מהעלויות · ${p.econ.ok ? 'עובר את הסף' : 'מתחת לסף'}`, tone: p.econ.ok ? 'text-go-ink' : 'text-stop' } : { i: 'k_profit', l: 'רווח יזמי', v: '—', s: 'הזינו פרמטרים יזמיים', tone: 'text-ink-4' }
           ].map(k => (
