@@ -577,7 +577,7 @@ function genParcel(streetId, num, idx, total, ov) {
   let status = R ? (R.st === 'clean' && mnStrong.length ? 'protocol' : R.st) : wpick(11, S.weights);
   if (NS && NS.s.topCo && NS.s.signedRatio >= 0.5) status = 'signed';
   const preservation = inp.preservation !== 'none';
-  const route = preservation ? 'preservation' : (status === 'file' || status === 'signed') && D[12] < 0.35 && inp.permitYear < 1980 ? 'tama' : inp.rova === '5-6' ? 'rova56' : inp.rova === 'ig' ? 'ig' : 'rova';
+  const route = preservation ? 'preservation' : (status === 'file' || status === 'signed') && (R ? (R.pm || []).some(m => m.t38) : D[12] < 0.35 && inp.permitYear < 1980) ? 'tama' : inp.rova === '5-6' ? 'rova56' : inp.rova === 'ig' ? 'ig' : 'rova';
   const RT = ROUTES[route];
 
   const built = calc.existing;
@@ -950,7 +950,7 @@ const INFO = {
   about: 'כלי לאיתור עסקאות התחדשות עירונית בתל אביב לפני שהשוק מגלה אותן. הוא סורק את כל החלקות הבנויות ברובעים 3–6 ובאבן גבירול, מחשב זכויות לפי התכניות שבתוקף, מסמן מתחרים ופעילות בוועדה, ומעריך רווח יזמי לפי הפרמטרים שלכם.',
   city: 'כרגע רק תל אביב-יפו. כל עיר נוספת דורשת את התכניות והשכבות שלה.',
   search: 'חיפוש רחוב בתחום הסריקה, או בחירה ב״סריקת רובע״ לקבלת כל הרובע מדורג לפי ציון.',
-  datapill: 'אמיתי: חלקות, מבנים, שימור, היתרים, תכניות, פרוטוקולים, בעלות ומחירי ייחוס לשכונה. מודעות: רק מה שאתם מזינים. הדגמה: פרטי נסח טאבו לכל דירה (הערות אזהרה, משכנתאות, שמות).',
+  datapill: 'אמיתי: חלקות, מבנים, שימור, היתרים, תכניות, פרוטוקולים, בעלות ומחירי ייחוס לשכונה. מודעות: רק מה שאתם מזינים. פרטי טאבו לכל דירה (הערות אזהרה, משכנתאות, שמות): רק אחרי שמעלים נסח לבניין. אין באתר נתוני הדגמה. מספרים שהם הנחה (למשל קו בניין קדמי) מסומנים ״הנחה״ בהסבר של כל בניין.',
   dev: 'עלויות, תמורה לבעלים, מחירי מכירה ורווח מינימלי. מזינים פעם אחת, והם משותפים לכל מי שעורך את הכלי. בלעדיהם אין חישוב רווח.',
   rules: 'כל הכללים שהמנוע משתמש בהם, עם מקור, רמת ודאות וחוזק משפטי. לחיצה על תגית כלל בבוחן הנכס פותחת אותו כאן.',
   pipeline: 'נכסים ששמרתם לבדיקה. הרשימה נשמרת בדפדפן הזה בלבד.',
@@ -1311,6 +1311,12 @@ function MarketSection({ p }) {
   const L = p.listing, nr = nadlanRef(p);
   return (
     <Section info="market" eyebrow="מודעה בבניין" title="מחיר מבוקש מול עסקאות בשכונה" icon="scale">
+      <Plain items={[
+        ['מה רואים כאן', 'אם ראיתם דירה למכירה בבניין הזה (ביד2, במדלן או אצל מתווך), מזינים אותה כאן. הכלי בודק אם היא זולה או יקרה ביחס למחיר שבו נמכרו דירות דומות בשכונה.'],
+        ['מאיפה המחיר של השכונה', 'מאתר נדל״ן של הממשלה (nadlan.gov.il): ממוצע של עסקאות אמיתיות בשנה האחרונה, לפי מספר חדרים.'],
+        ['למה זה חשוב', 'דירה זולה בבניין שיש בו הרבה זכויות היא הזדמנות כפולה: קונים בזול, ומרוויחים מהפרויקט שיבוא.'],
+        ['חשוב לדעת', 'הממוצע הוא של כל השכונה, לא של הרחוב. דירה קטנה או בקומה נמוכה תיראה זולה גם כשהמחיר שלה הוגן.']
+      ]} />
       <div className="mb-2 text-2xs rounded-md bg-canvas border border-line text-ink-2 px-2 py-1">מודעות שאתם מזינים בלבד. אין סריקה של יד2 או מדלן: תנאי השימוש שלהם אוסרים זאת. {st.note || ''}</div>
       {L && !edit ? (<>
         <div className="rounded-lg border border-line p-2.5 flex items-center justify-between gap-3">
@@ -1409,6 +1415,17 @@ function EconSection({ p, onOpenDev }) {
   const row = (l, v, strong, neg) => <div className={`flex justify-between gap-2 px-2.5 py-1 ${strong ? 'font-bold text-ink' : 'text-ink-2'}`}><span>{l}</span><Num className={neg ? 'text-stop' : ''}>{v}</Num></div>;
   return (
     <Section info="econ" eyebrow="כלכלה יזמית" title="רווח לפי הפרמטרים שלכם" icon="scale">
+      <Plain open={!!(e && e.state === 'ok')} items={e && e.state === 'ok' ? (() => { const b = e.best; return [
+        ['כמה נמכר', `בבניין החדש יש ${n0(b.saleable)} מ״ר שהיזם מוכר (אחרי שהבעלים מקבלים את הדירות שלהם). מתוך זה ${pct(e.net, 0)} הם שטח דירות נטו, כלומר ${n0(b.saleable * e.net)} מ״ר.`],
+        ['כמה כסף נכנס', `${n0(b.saleable * e.net)} מ״ר × ${ils(e.sale)} למ״ר = ${ils(b.revenue)}.`],
+        ['כמה כסף יוצא', `בנייה ${ils(b.construction)}${b.soft ? `, הוצאות רכות ומימון ${ils(b.soft)}` : ''}${b.owners ? `, חניה ושכירות לבעלים ${ils(b.owners)}` : ''}${b.levy ? `, היטל השבחה ${ils(b.levy)}` : ''}. סה״כ ${ils(b.cost)}.`],
+        ['השורה התחתונה', `${ils(b.revenue)} פחות ${ils(b.cost)} = רווח של ${ils2(b.profit)}, שהם ${pct(b.pct, 1)} מהעלויות. הסף שקבעתם הוא ${pct(e.min, 0)}, ולכן הבניין ${e.ok ? 'עובר אותו' : 'לא עובר אותו'}.`],
+        ['מה לא נכלל', 'הקרקע לא עולה כסף, כי משלמים עליה בדירות לבעלים. לא נכללים: מס רכישה, שמאי ועורך דין, וסטיות בלוח הזמנים.']
+      ]; })() : [
+        ['מה רואים כאן', 'כמה כסף יזם ירוויח מהבניין הזה, לפי המחירים והעלויות שאתם מזינים.'],
+        ['מה חסר', 'עוד לא הוזנו פרמטרים יזמיים: עלות בנייה למ״ר, מחיר מכירה למ״ר, כמה מקבלים הבעלים, ומה הרווח המינימלי שלכם.'],
+        ['מה עושים', 'לוחצים ״הזנת פרמטרים״. מזינים פעם אחת, והכלי מחשב לכל הבניינים בבת אחת.']
+      ]} />
       {(!e || e.state === 'none' || e.state === 'missing') ? (
         <div className="rounded-lg border border-dashed border-line p-3 text-[12.5px] text-ink-2">
           {e && e.state === 'missing' ? `חסרים פרמטרים לחלקה הזו: ${e.need.map(k => (DEV_FIELDS.find(f => f.k === k) || {}).label).join(', ')}.` : 'עוד לא הוזנו פרמטרים יזמיים.'}
@@ -1527,7 +1544,7 @@ function Header({ onOpenAbout, onOpenDev, devMissing, onOpenRules, query, setQue
 
         {/* Pipeline */}
         <div ref={pipeRef} className="relative ms-auto flex items-center gap-2">
-          <span className="hidden md:inline-flex items-center gap-1 text-2xs font-semibold text-act-ink bg-act-soft ring-1 ring-inset ring-act/30 rounded-md px-1.5 py-0.5">נתוני עירייה ומדינה: אמיתי · טאבו לדירה: הדגמה <Info k="datapill" className="ms-1" /></span>
+          <span className="hidden md:inline-flex items-center gap-1 text-2xs font-semibold text-act-ink bg-act-soft ring-1 ring-inset ring-act/30 rounded-md px-1.5 py-0.5">נתונים אמיתיים · הנחות מסומנות · טאבו אחרי העלאת נסח <Info k="datapill" className="ms-1" /></span>
           <Btn variant="soft" className="h-9 px-3" onClick={onOpenAbout}><Icon name="info" className="w-4 h-4" /><span>איך זה עובד</span></Btn>
           <Btn variant="ghost" className="h-9 px-3 relative" onClick={onOpenDev}><Icon name="scale" className="w-4 h-4" /><span className="hidden sm:inline">פרמטרים יזמיים</span>{devMissing && <span className="absolute -top-1 -end-1 w-2.5 h-2.5 rounded-full bg-stop ring-2 ring-white" />}</Btn><Info k="dev" />
           <Btn variant="ghost" className="h-9 px-3" onClick={onOpenRules}><Icon name="layers" className="w-4 h-4" /><span className="hidden sm:inline">ספריית כללים</span><span className="num text-[11px] text-ink-3">{RULES.length}</span></Btn><Info k="rules" />
@@ -1736,7 +1753,7 @@ function RealCadastralMap({ parcels, visibleIds, selectedId, onSelect, highlight
       <div className="flex items-center justify-between px-3 py-2 border-b border-line">
         <div>
           <div className="text-[13px] font-bold text-ink flex items-center gap-1">מפה קדסטרלית <Info k="map" /></div>
-          <div className="text-2xs text-ink-3">פוליגוני חלקות אמיתיים · GIS עירוני · מסובב לאורך הרחוב</div>
+          <div className="text-2xs text-ink-3">כל צורה היא מגרש אמיתי. הצבע אומר מה המצב (מקרא למטה). לחיצה פותחת את הבניין.</div>
         </div>
         <div className="flex items-center gap-1">
           <button onClick={() => setZoom(z => Math.max(0.4, +(z - 0.2).toFixed(2)))} className="w-7 h-7 grid place-items-center rounded-md border border-line text-ink-2 hover:bg-canvas" aria-label="הקטנה"><Icon name="minus" className="w-3.5 h-3.5" /></button>
@@ -2004,6 +2021,26 @@ function OrderListModal({ rows, onClose, toast }) {
   );
 }
 
+function QuickGuide() {
+  const [hide, setHide] = useState(() => { try { return localStorage.getItem('israprop.guide.hide') === '1'; } catch (e) { return false; } });
+  if (hide) return null;
+  const close = () => { setHide(true); try { localStorage.setItem('israprop.guide.hide', '1'); } catch (e) {} };
+  const steps = [
+    ['בוחרים אזור', 'מקלידים רחוב בחיפוש למעלה, או בוחרים ״סריקת רובע״.'],
+    ['מסתכלים על השלב', '״להזמין נסח״ = שווה בדיקה. ״דילוג״ = יזם אחר כבר שם.'],
+    ['מזמינים נסח', 'הכפתור ״רשימה להזמנת נסחים״ מתחת לטבלה נותן גוש וחלקה.'],
+    ['מעלים את הנסח', 'בכרטיס הבניין. בניין בלי יזם יסומן ״נקי בטאבו״.']
+  ];
+  return (
+    <div className="px-3 py-2 border-b border-line bg-accent-soft/40">
+      <div className="flex items-center justify-between gap-2 mb-1.5"><span className="text-[12.5px] font-bold text-ink">איך משתמשים, ב-4 צעדים</span><button onClick={close} className="text-2xs font-semibold text-accent hover:underline">הבנתי, להסתיר</button></div>
+      <ol className="grid grid-cols-2 lg:grid-cols-4 gap-2">{steps.map(([h, t], i) => (
+        <li key={i} className="flex gap-1.5"><span className="num w-5 h-5 shrink-0 rounded-full bg-accent text-white text-[11px] font-bold grid place-items-center">{i + 1}</span><span className="min-w-0"><span className="block text-[12px] font-bold text-ink">{h}</span><span className="block text-2xs text-ink-2 leading-snug">{t}</span></span></li>
+      ))}</ol>
+    </div>
+  );
+}
+
 function FeedColumn({ onOpenOrder, onOpenDev, compact, parcels, rows: allRows, tab, setTab, sort, setSort, view, setView, selectedId, onSelect, scanning, scanStep, target, setHighlightId, highlightId, chipsActive }) {
   const counts = useMemo(() => Object.fromEntries(TABS.map(t => [t.id, parcels.filter(t.test).length])), [parcels]);
   const [limit, setLimit] = useState(150);
@@ -2011,6 +2048,7 @@ function FeedColumn({ onOpenOrder, onOpenDev, compact, parcels, rows: allRows, t
   const rows = allRows.slice(0, limit);
   return (
     <Card className="flex flex-col min-h-[420px] xl:min-h-0 xl:h-full overflow-hidden">
+      <QuickGuide />
       <div className="px-3 pt-2.5 border-b border-line">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="min-w-0">
@@ -2543,6 +2581,12 @@ function CtxSection({ p }) {
     .filter(x => TRANSIT[x.key]).sort((a, b) => a.d - b.d);
   return (
     <Section info="ctx" eyebrow="סביבה ותשתיות" title="מה יש ליד הבניין, ומה מתוכנן" icon="pin">
+      <Plain items={[
+        ['מה רואים כאן', 'מה נמצא בהליכה מהבניין: רכבת קלה, מטרו, אוטובוסים, גנים ובתי ספר, פארקים, רעש, ותקן חניה. המרחקים נמדדים מגבול המגרש.'],
+        ['מאיפה זה מגיע', 'מהמפה הדיגיטלית של עיריית תל אביב (GIS). מתעדכן כל שבוע.'],
+        ['איך לקרוא את זה', 'מה שכבר קיים (אוטובוסים, בתי ספר) כבר מגולם במחיר של השכונה. מה שעוד לא קיים, כמו הקו הסגול, הירוק או המטרו, יכול להעלות מחירים בעתיד. רעש חזק ברחוב מוריד את המחיר של הדירות שפונות לרחוב.'],
+        ['חשוב לדעת', 'המידע הזה לא משנה את הרווח ואת הציון. הוא עוזר להחליט בין שני בניינים דומים.']
+      ]} />
       <div className="mb-2 text-2xs rounded-md bg-canvas border border-line text-ink-2 px-2 py-1">נתון אמיתי מה-GIS העירוני. מידע בלבד: לא משנה את הציון ולא את הרווח.</div>
       {c.future.length > 0 && (
         <div className="mb-2.5 rounded-lg bg-go-soft text-go-ink px-2.5 py-2 text-[12.5px] leading-snug flex gap-2">
@@ -2617,54 +2661,57 @@ function NesachUpload({ p, compact }) {
   );
 }
 
+/* Plain-language block: what you see, where it comes from, what to do with it. Same format in every section. */
+function Plain({ items, open: open0 = false, title = 'בשפה פשוטה' }) {
+  const [open, setOpen] = useState(open0);
+  return (
+    <div className="mb-2.5 rounded-lg border border-accent/25 bg-accent-soft/30">
+      <button onClick={() => setOpen(o => !o)} className="w-full flex items-center justify-between gap-2 px-2.5 py-1.5 text-start" aria-expanded={open}>
+        <span className="text-[12px] font-bold text-accent inline-flex items-center gap-1"><Icon name="info" className="w-3.5 h-3.5" />{title}</span>
+        <Icon name="chevron" className={`w-4 h-4 text-ink-3 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && <dl className="px-2.5 pb-2 grid gap-1.5">{items.filter(Boolean).map(([h, t], i) => (
+        <div key={i}><dt className="text-2xs font-bold text-ink">{h}</dt><dd className="text-[12px] text-ink-2 leading-relaxed">{t}</dd></div>
+      ))}</dl>}
+    </div>
+  );
+}
+
 function TabuSection({ p, legalSigned }) {
   const { remove } = React.useContext(NesachCtx);
   const NS = p.nesach;
   if (!NS) return (
     <Section info="tabu" eyebrow="טאבו" title="בדיקה משפטית וחלק בקרקע" icon="key">
+      <Plain items={[
+        ['מה זה נסח טאבו', 'מסמך רשמי של רשות המקרקעין שמראה מי הבעלים של כל דירה, ומה רשום עליה: משכנתאות, עיקולים, והערות אזהרה.'],
+        ['למה זה הכי חשוב', 'יזם שהחתים דיירים רושם ״הערת אזהרה״ על הדירות שלהם. זה קורה הרבה לפני שהוא מגיש משהו לעירייה, ולכן רק הנסח מגלה אם מישהו כבר תפס את הבניין.'],
+        ['מה עושים', `מזמינים ״נסח מרוכז״ באתר רשות המקרקעין לפי גוש ${p.gush} חלקה ${p.chelka}, ומעלים את קובץ ה-PDF כאן. הכלי קורא אותו לבד.`],
+        ['פרטיות', 'הקובץ נקרא בדפדפן שלכם ונשמר רק בו. שמות ותעודות זהות לא נשלחים לשום מקום.']
+      ]} />
       <div className="mb-2 rounded-lg border border-dashed border-line p-2.5">
         <div className="text-[12px] text-ink-2 mb-2">העלו נסח טאבו מרוכז (PDF מהאתר של רשות המקרקעין), והכלי יקרא ממנו הערות אזהרה, משכנתאות, עיקולים, בעלים, דירות במרתף והצמדות גג. הקובץ נקרא בדפדפן שלכם ונשמר בו בלבד: שמות ותעודות זהות לא נשלחים לשום מקום.</div>
         <NesachUpload p={p} />
       </div>
-      <div className="mb-2 text-2xs rounded-md bg-act-soft text-act-ink px-2 py-1">עד שיועלה נסח: מספר תתי-החלקות, רישום הבית המשותף וסוג הבעלות הם נתונים אמיתיים (data.gov.il). שאר הסעיף מטה הוא הדגמה.</div>
-                    <div className="divide-y divide-line-soft">
-            <LegalRow ok={!legalSigned} warn={p.status === 'file'}
-              title={legalSigned ? `נמצאו ${legalSigned} הערות אזהרה (סעיף 126)` : 'אין הערות אזהרה לטובת יזם (סעיף 126)'}
-              detail={legalSigned ? `לטובת ${p.developer}. ${legalSigned >= Math.ceil(p.units * 2 / 3) ? 'מעל רוב של שני שלישים: הזכויות נעולות.' : 'עדיין מתחת לרוב הנדרש.'}` : `נבדקו ${p.units} תתי-חלקות בנסח מ-01/11/2026.`} />
-            <LegalRow ok={p.condoRegistered} warn={!p.condoRegistered} title={p.condoRegistered ? 'בית משותף רשום' : 'בית משותף לא רשום'} detail={p.condoRegistered ? 'צו רישום ותקנון קיימים. חלקי הרכוש המשותף מוגדרים.' : 'נדרש רישום לפני חתימה עם יזם. מאריך את לוח הזמנים.'} />
-            {p.ownReal && <LegalRow ok={!p.nonPrivate.length} warn={!!p.nonPrivate.length} title={`סוג בעלות: ${p.ownTypes.join(', ')}`} detail={p.nonPrivate.length ? 'חלק מהזכויות אינן פרטיות. בעלות מדינה עשויה להיות חכירה מרמ״י, שמחייבת הסכמה ודמי היתר. בדקו בנסח.' : p.condoRegistered ? `בעלות פרטית. ${p.units} תתי-חלקות רשומות, כלומר ${p.units} בעלי זכויות לפחות להחתמה.` : `בעלות פרטית. אין תתי-חלקות רשומות, ולכן מספר הדירות (${p.units}) הוא הערכה.`} />}
-            <LegalRow ok={!p.roofAttached} warn={p.roofAttached} title={p.roofAttached ? `זכויות הגג צמודות לתת-חלקה ${p.units}` : 'זכויות הגג ברכוש המשותף'} detail={p.roofAttached ? 'בעל הדירה העליונה מחזיק בזכויות הבנייה על הגג. רכישת דירה אחרת לא מקנה אותן.' : 'כל הבעלים חולקים את הזכויות לפי החלק בקרקע.'} />
-            {p.estate && <LegalRow ok={false} warn title="עזבון / ירושה פתוחה" detail="אחת הדירות רשומה על שם נפטר. מוכרים מעזבון נוטים למכור מהר ומתחת לשוק." />}
-            <LegalRow ok={!p.lien} warn={false} title={p.lien ? 'נמצא עיקול על תת-חלקה' : 'אין עיקולים'} detail={p.mortgages ? `${p.mortgages} משכנתאות רשומות (רגיל).` : 'אין משכנתאות רשומות.'} />
-          </div>
-
-          <div className="mt-3">
-            <div className="flex items-center justify-between mb-1.5"><span className="eyebrow">חלק בקרקע לפי דירה · הדגמה</span><span className="text-2xs text-ink-3">שטח רשום · מ״ר</span></div>
-            <div className="border border-line rounded-lg overflow-hidden">
-              <div className="max-h-48 overflow-y-auto scroll-thin">
-                <table className="w-full text-2xs">
-                  <thead className="sticky top-0 bg-canvas text-ink-3"><tr className="[&>th]:px-2 [&>th]:py-1.5 [&>th]:text-start [&>th]:font-semibold"><th>תת-חלקה</th><th>קומה</th><th>שטח</th><th>חלק בקרקע</th><th>הערות</th></tr></thead>
-                  <tbody>
-                    {p.unitList.map(u => (
-                      <tr key={u.id} className="border-t border-line-soft [&>td]:px-2 [&>td]:py-1">
-                        <td><Num className="font-semibold text-ink">{u.id}</Num></td>
-                        <td className="text-ink-2">{u.floor === 0 ? 'קרקע' : <Num>{u.floor}</Num>}</td>
-                        <td><Num>{u.area}</Num></td>
-                        <td><div className="flex items-center gap-1.5"><Num className="w-10">{pct(u.share, 1)}</Num><span className="h-1 w-10 bg-line-soft rounded-full overflow-hidden"><span className="block h-full bg-accent/70 rounded-full" style={{ width: `${u.share * p.units * 50}%` }} /></span></div></td>
-                        <td><div className="flex flex-wrap gap-1">{u.notes.map(n => <span key={n} className={`px-1 rounded ${NOTE_STYLE[n]}`}>{NOTE_LABEL[n]}</span>)}</div></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
+      <div className="divide-y divide-line-soft">
+        <LegalRow ok={p.condoRegistered} warn={!p.condoRegistered} title={p.condoRegistered ? `בית משותף רשום: ${p.units} דירות (תתי-חלקות)` : 'בית משותף לא רשום'} detail={p.condoRegistered ? 'מספר הדירות הוא נתון אמיתי מפנקסי המקרקעין (data.gov.il).' : `אין תתי-חלקות רשומות. מספר הדירות (${p.units}) הוא הערכה לפי קומות ותכסית. רישום בית משותף מאריך את לוח הזמנים.`} />
+        {p.ownReal && <LegalRow ok={!p.nonPrivate.length} warn={!!p.nonPrivate.length} title={`סוג בעלות: ${p.ownTypes.join(', ')}`} detail={p.nonPrivate.length ? 'חלק מהזכויות אינן פרטיות. בעלות מדינה עשויה להיות חכירה מרמ״י, שמחייבת הסכמה ודמי היתר.' : 'בעלות פרטית (data.gov.il).'} />}
+      </div>
+      <div className="mt-2 rounded-lg bg-canvas border border-line p-2.5 text-[12px] text-ink-2">
+        <div className="font-bold text-ink mb-1">מה עוד לא ידוע בלי נסח</div>
+        <ul className="grid gap-0.5 list-disc ps-4"><li>האם יזם כבר החתים דיירים (הערות אזהרה)</li><li>משכנתאות ועיקולים</li><li>ירושות, ומי הבעלים בכל דירה</li><li>האם הגג צמוד לדירה מסוימת, ואם יש דירות במרתף</li></ul>
+      </div>
     </Section>
   );
   const S = NS.s, n = NS.n;
   const Stat = ({ l, v, sub, tone = 'text-ink' }) => <div className="bg-white p-2 min-w-0"><div className="text-2xs text-ink-3">{l}</div><div className={`text-[15px] font-bold leading-tight ${tone}`}>{v}</div>{sub && <div className="text-2xs text-ink-3 truncate">{sub}</div>}</div>;
   return (
     <Section info="tabu" eyebrow="טאבו · נסח אמיתי" title="בדיקה משפטית וחלק בקרקע" icon="key">
+      <Plain open items={[
+        ['השורה החשובה ביותר', S.topCo && S.signedRatio >= 0.5 ? `חברה בשם ${S.topCo.name} רשמה הערות אזהרה על ${S.topCo.units.length} מתוך ${S.units} דירות. היא כבר החתימה את רוב הבניין. לא כדאי להתחרות.` : S.warnUnits ? `יש הערות אזהרה על ${S.warnUnits} מתוך ${S.units} דירות, אבל לאף יזם אין רוב. יש מתחרה, ואפשר עוד להיכנס.` : 'אין הערות אזהרה של יזם. אף אחד לא החתים את הדיירים. זה מה שמחפשים.'],
+        ['כמה אנשים צריך לשכנע', `${S.ownerCount} בעלים שונים. ככל שיש פחות בעלים, קל יותר להחתים.`],
+        ['משכנתאות ועיקולים', `${S.mortUnits ? `משכנתאות על ${S.mortUnits} דירות: רגיל, הבנק צריך לאשר.` : 'אין משכנתאות.'} ${S.liens.length ? `${S.liens.length} עיקולים: צריך לסלק לפני שמעבירים זכויות.` : 'אין עיקולים.'}`],
+        ['גג ומרתף', `${S.roof.length ? `הגג צמוד לדירה ${[...new Set(S.roof.map(r => r.unit))].join(', ')}: בעל הדירה הזו יבקש יותר.` : 'הגג משותף לכולם.'} ${S.basement.length ? `${S.basement.length} דירות במרתף נכנסו לחישוב הזכויות.` : ''}`]
+      ]} />
       <div className="mb-2 flex flex-wrap items-center gap-2 justify-between">
         <div className="text-2xs text-ink-2">נסח מרוכז מ-<Num>{n.date}</Num>{n.number && <> · מס׳ <Num>{n.number}</Num></>} · נשמר בדפדפן הזה בלבד</div>
         <div className="flex gap-2"><NesachUpload p={p} compact /><Btn variant="ghost" className="h-8 px-2.5" onClick={() => remove(`${p.gush}-${p.chelka}`)}>מחיקה</Btn></div>
@@ -2744,8 +2791,15 @@ function Inspector({ onOpenDev, p, onClose, onExport, onSave, saved, onContact, 
       {/* Body */}
       <div className="flex-1 min-h-0 overflow-y-auto scroll-thin">
         <div className="px-4 py-3 bg-accent-soft/60 border-b border-line">
-          <div className="flex items-center gap-1.5 text-2xs font-bold text-accent mb-1"><Icon name="spark" className="w-3.5 h-3.5" />סינתזת AI</div>
+          <div className="flex items-center gap-1.5 text-2xs font-bold text-accent mb-1"><Icon name="spark" className="w-3.5 h-3.5" />סיכום</div>
           <p className="text-[12.5px] text-ink leading-relaxed">{p.ai}</p>
+          <div className="mt-1.5 text-[12.5px] text-ink"><b>הצעד הבא: </b>{{
+            order: `להזמין נסח טאבו מרוכז (גוש ${p.gush}, חלקה ${p.chelka}) ולהעלות אותו בסעיף ״טאבו״ למטה.`,
+            clean: 'הנסח נקי. לבדוק תיק מידע בעירייה, לצאת לסיור ולפנות לבעלים.',
+            contested: 'יזם אחר התחיל להחתים. להחליט אם להתחרות, ומהר.',
+            skip: 'לדלג. יזם אחר כבר מקדם פרויקט בבניין.',
+            watch: p.econ && p.econ.state === 'ok' ? 'לא בעדיפות: הרווח מתחת לסף שקבעתם, או שיש בקשה פתוחה. אפשר לעבור לבניין הבא.' : 'לא בעדיפות כרגע. אחרי שתזינו פרמטרים יזמיים, הכלי יבדוק אם הוא עובר את סף הרווח שלכם.'
+          }[p.stage]}</div>
         </div>
 
         <RightsCalculator p={p} onOverride={onOverride} onReset={onReset} openRule={openRule} />
@@ -2757,6 +2811,11 @@ function Inspector({ onOpenDev, p, onClose, onExport, onSave, saved, onContact, 
         <TabuSection p={p} legalSigned={legalSigned} />
 
         <Section info="plans" eyebrow="צנרת תכנונית" title="תכניות חלות ופרוטוקולי ועדה" icon="file">
+          <Plain items={[
+            ['מה רואים כאן', 'כל מה שהעירייה יודעת על הבניין: בקשות היתר, היתרים, אזכורים בישיבות של ועדת התכנון, ותכניות בהכנה. מהחדש לישן.'],
+            ['איך לקרוא את זה', '״בקשה פתוחה״ או ״היתר״: מישהו כבר מקדם פרויקט, בדרך כלל יזם. אזכור בפרוטוקול של הוועדה בלי בקשה: סימן מוקדם שמישהו מתחיל. בלי כלום: אין סימן ציבורי ליזם, אבל רק נסח טאבו מאשר שאין.'],
+            ['מה עושים', 'לוחצים ״פתיחת המסמך״ ליד אזכור כדי לקרוא את הפרוטוקול המקורי.']
+          ]} />
           <div className="flex flex-wrap gap-1.5 mb-3">
             {p.plans.map(pl => <span key={pl} className="text-2xs font-semibold px-1.5 py-0.5 rounded bg-canvas border border-line text-ink-2">{pl}</span>)}
           </div>
