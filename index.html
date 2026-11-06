@@ -1979,7 +1979,7 @@ function OrderListModal({ rows, onClose, toast }) {
   return (
     <Modal title="רשימה להזמנת נסחים" onClose={onClose} wide footer={<>
       <span className="text-2xs text-ink-3 me-auto">{list.length} בניינים · לפי {list.some(p => p.econ && p.econ.state === 'ok') ? 'רווח יזמי' : 'ציון סינון'}</span>
-      <a href={csvHref} download="nesach-order-list.csv" className="h-9 px-3 inline-flex items-center rounded-lg border border-line text-[12.5px] font-semibold text-ink hover:bg-canvas">הורדת CSV</a>
+      {!window.claude && <a href={csvHref} download="nesach-order-list.csv" className="h-9 px-3 inline-flex items-center rounded-lg border border-line text-[12.5px] font-semibold text-ink hover:bg-canvas">הורדת CSV</a>}
       <Btn variant="primary" className="h-9 px-3" onClick={copy}>העתקה</Btn>
     </>}>
       <p className="text-[13px] text-ink-2 leading-relaxed mb-3">אלה הבניינים שעברו את הסינון הציבורי ועוד לא נבדקו בטאבו. הזמינו לכל אחד <b>נסח מרוכז</b> לפי גוש וחלקה, והעלו אותו בכרטיס הבניין. בניין בלי הערות אזהרה של חברה יסומן ״נקי בטאבו״. <Info k="orderlist" /></p>
