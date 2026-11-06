@@ -398,6 +398,8 @@ const dateBack = days => { const d = new Date(TODAY); d.setDate(d.getDate() - da
 
 let AREA_META = { fetched: '', origin: [178000, 662000] };
 let AREA_IDX = {}, AREA_STREETS = {}, AREA_BY_ZONE = {}, MENTIONS = {}, SEARCH_INDEX = [], NADLAN = null, CTX = null, LISTINGS = {};
+/* Tabu extracts the user uploaded, parsed in this browser. Kept ONLY in localStorage: owner names and ids never go to the shared db or the public site. */
+let NESACH = (() => { try { return JSON.parse(localStorage.getItem('israprop.nesach.v1') || '{}') || {}; } catch (e) { return {}; } })();
 const ZONE_META = {
   '3': { label: 'רובע 3', hood: 'הצפון הישן', mkt: 63000 },
   '4': { label: 'רובע 4', hood: 'הצפון הישן · מזרח', mkt: 60000 },
@@ -539,18 +541,22 @@ function genParcel(streetId, num, idx, total, ov) {
   const wpick = (i, w) => { let acc = 0; for (const [k, v] of Object.entries(w)) { acc += v; if (D[i] < acc) return k; } return Object.keys(w)[0]; };
 
   const base = baseInputs(streetId, num);
+  const R0 = realRec(streetId, num);
+  const NS = R0 ? NESACH[`${R0.g}-${R0.c}`] || null : null;
+  if (NS && NS.s.basementArea > 0) { base.basement = Math.round(NS.s.basementArea); base.basementUnit = true; }
   const inp = { ...base, ...(ov || {}) };
   const resFloors = Math.max(1, inp.floors - (inp.pilotis ? 1 : 0));
   const RR0 = realRec(streetId, num);
   const own = RR0 && RR0.own ? RR0.own : null;
-  const units = own && own.u > 0 ? own.u : resFloors * base.perFloor;
+  const units = NS ? NS.s.units : own && own.u > 0 ? own.u : resFloors * base.perFloor;
   const calc = computeRights({ ...inp, units, streetId });
 
   const R = realRec(streetId, num);
   const MN = R ? (MENTIONS[`${R.g}-${R.c}`] || []) : [];
   const STRONG = ['תמ"א 38', 'חלופת שקד / סעיף 70', 'תוספת קומות', 'הריסה ובנייה', 'התחדשות עירונית', 'פינוי-בינוי', 'דיון בהפקדה', 'תיק מידע'];
   const mnStrong = MN.filter(m => (m.d || '') >= '2025' && m.t === 'gc' && !m.cw && !(m.kw || []).includes('ניוד זכויות') && (m.kw || []).some(k => STRONG.includes(k)));
-  const status = R ? (R.st === 'clean' && mnStrong.length ? 'protocol' : R.st) : wpick(11, S.weights);
+  let status = R ? (R.st === 'clean' && mnStrong.length ? 'protocol' : R.st) : wpick(11, S.weights);
+  if (NS && NS.s.topCo && NS.s.signedRatio >= 0.5) status = 'signed';
   const preservation = inp.preservation !== 'none';
   const route = preservation ? 'preservation' : (status === 'file' || status === 'signed') && D[12] < 0.35 && inp.permitYear < 1980 ? 'tama' : inp.rova === '5-6' ? 'rova56' : inp.rova === 'ig' ? 'ig' : 'rova';
   const RT = ROUTES[route];
@@ -562,16 +568,16 @@ function genParcel(streetId, num, idx, total, ov) {
   const addText = calc.best ? calc.best.short : 'אין תוספת';
 
   const sigRange = { clean: [0, 0.12], protocol: [0.25, 0.6], file: [0.55, 0.85], signed: [0.67, 1] }[status];
-  const signedUnits = Math.round(units * u(13, sigRange[0], sigRange[1]));
-  const developer = R ? null : status === 'signed' || (status === 'file' && D[15] < 0.6) ? pick(14, DEVS) : null;
+  const signedUnits = NS ? (NS.s.topCo ? NS.s.topCo.units.length : 0) : Math.round(units * u(13, sigRange[0], sigRange[1]));
+  const developer = NS ? (NS.s.topCo ? NS.s.topCo.name : null) : R ? null : status === 'signed' || (status === 'file' && D[15] < 0.6) ? pick(14, DEVS) : null;
   const architect = status === 'file' || status === 'protocol' ? pick(16, ARCHS) : null;
-  const estate = !R && D[17] < 0.16; // unknown for real parcels until a nesach is loaded
-  const roofAttached = D[18] < 0.38;
-  const condoRegistered = own ? own.u > 0 : D[19] < 0.86;
+  const estate = NS ? NS.s.estate > 0 : !R && D[17] < 0.16; // unknown for real parcels until a nesach is loaded
+  const roofAttached = NS ? NS.s.roof.length > 0 : D[18] < 0.38;
+  const condoRegistered = NS ? true : own ? own.u > 0 : D[19] < 0.86;
   const ownTypes = own ? Object.keys(own.t) : [];
   const nonPrivate = ownTypes.filter(t => t !== 'פרטית');
-  const mortgages = Math.floor(D[20] * Math.max(1, Math.floor(units / 3) + 1));
-  const lien = D[21] < 0.05;
+  const mortgages = NS ? NS.s.mortUnits : Math.floor(D[20] * Math.max(1, Math.floor(units / 3) + 1));
+  const lien = NS ? NS.s.liens.length > 0 : D[21] < 0.05;
 
   const gush = R ? R.g : S.gush[Math.min(S.gush.length - 1, Math.floor(idx / total * S.gush.length))];
   const chelka = R ? R.c : ui(22, 12, 214);
@@ -612,7 +618,12 @@ function genParcel(streetId, num, idx, total, ov) {
   const sigSet = new Set(order.slice(0, Math.min(units, signedUnits)));
   const mortSet = new Set(order.slice().reverse().slice(0, Math.min(units, mortgages)));
   const estateUnit = estate ? order[Math.floor(ur() * units)] : null;
-  const unitList = raw.map((w, i) => {
+  const unitList = NS ? NS.n.units.map(x => ({
+    id: x.id, floor: x.floor || '—', area: x.area, share: fracVal(x.share) || 0, shareTxt: x.share,
+    owners: x.owners.map(o => o.name).join(', '),
+    notes: [...(x.notes.some(z => z.type === 'warn') ? ['warn126'] : []), ...(x.mortgages.length ? ['mortgage'] : []), ...(x.notes.some(z => z.type === 'lien') ? ['lien'] : []),
+      ...(x.owners.some(o => /ירושה|צוואה/.test(o.how) && o.year >= 2018) ? ['estate'] : []), ...(x.attach.some(a => /גג/.test(a.desc)) ? ['roof'] : []), ...(/מרתף/.test(x.floor || '') ? ['basement'] : [])]
+  })) : raw.map((w, i) => {
     const notes = [];
     if ((status === 'signed' || status === 'file') && developer && sigSet.has(i + 1)) notes.push('warn126');
     if (mortSet.has(i + 1)) notes.push('mortgage');
@@ -669,8 +680,9 @@ function genParcel(streetId, num, idx, total, ov) {
   if (preservation) events.push({ date: 'קבוע', src: 'תא/2650ב', tag: 'שימור', text: inp.preservation === 'strict' ? 'מבנה לשימור בהגבלות מחמירות: אין תוספת. הזכויות ניתנות להעברה למגרש אחר.' : 'מבנה לשימור: תמריצי תוספת (גג, צד, מרתף) בכפוף לשחזור החזיתות. אין הריסה.' });
   if (route === 'tama') events.push({ date: 'הוראות מעבר', src: 'תמ״א 38', tag: 'מסלול שפקע', text: 'תמ״א 38 פקעה בת״א ב-29.8.2024. התיק ממשיך רק כי תיק המידע הונפק עד 1.8.2024 והבקשה הוגשה עד 31.12.2024.' });
 
+  if (NS) ai = nesachAi(NS, units) + ' ' + ai;
   return {
-    id: `${streetId}-${num}`, streetId, street: S.he, num, address: `${S.he} ${num}`, hood: S.hood, rovaLabel: S.rovaLabel,
+    nesach: NS, id: `${streetId}-${num}`, streetId, street: S.he, num, address: `${S.he} ${num}`, hood: S.hood, rovaLabel: S.rovaLabel,
     gush, chelka, year: base.year, floors: inp.floors, footprint: inp.typ, units, perFloor: base.perFloor, built, allowed, unused, unusedRatio, addText,
     inputs: inp, baseInputs: base, overridden: ov ? Object.keys(ov) : [], calc,
     status, route, preservation, developer, architect, signedUnits, estate, roofAttached, condoRegistered, mortgages, lien,
@@ -678,6 +690,162 @@ function genParcel(streetId, num, idx, total, ov) {
     basis, upliftApproval, cagr, mkt: S.mkt, score, highConviction, unitList, plans, events, ai, real: !!R, poly: R ? R.poly : null,
     ctx: ctxOf(R), mentions: MN.length, ownReal: !!own, ownTypes, nonPrivate, verifiedAdd: calc.verified != null ? calc.verified - built : null, rangeLo: calc.range.lo - built, rangeHi: calc.range.hi - built
   };
+}
+
+/* =========================================================================
+   2d. TABU NESACH READER (pdf.js in the browser)
+   ========================================================================= */
+/* Tabu "נסח מרוכז" (condominium consolidated extract) parser. Pure functions; used in the page and in Node tests.
+   nesachLines(pdfjsDoc) -> array of text lines (items grouped by y, ordered left->right like pdftotext -layout).
+   parseNesach(lines) -> structured result. Personal data (names, ids) stays in the caller's browser. */
+async function nesachLines(doc) {
+  const out = [];
+  for (let pn = 1; pn <= doc.numPages; pn++) {
+    const page = await doc.getPage(pn);
+    const tc = await page.getTextContent();
+    const rows = [];
+    tc.items.forEach(it => {
+      if (!it.str || !it.str.trim()) return;
+      const y = it.transform[5], x = it.transform[4];
+      let r = rows.find(r => Math.abs(r.y - y) < 2.5);
+      if (!r) { r = { y, items: [] }; rows.push(r); }
+      r.items.push({ x, s: it.str });
+    });
+    rows.sort((a, b) => b.y - a.y);
+    rows.forEach(r => out.push(r.items.sort((a, b) => a.x - b.x).map(i => i.s.trim()).join('  ')));
+  }
+  return out;
+}
+
+function parseNesach(rawLines) {
+  const clean = s => s.replace(/[‎‏‪-‮⁦-⁩]/g, '').replace(/\s+/g, ' ').trim();
+  const lines = rawLines.map(clean).filter(Boolean);
+  const all = lines.join('\n');
+  const res = { ok: false, gush: null, chelka: null, date: null, number: null, consolidated: /מרוכז/.test(all), lot: null, takanon: null, subsDeclared: null, address: null, units: [], warnings: [] };
+  let m = all.match(/(\d+)\s+חלקה\s*:\s*(\d+)\s+גוש\s*:/);
+  if (m) { res.chelka = +m[1]; res.gush = +m[2]; }
+  else if ((m = all.match(/חלקה\s*(\d+)\s*:\s*גוש\s*(\d+)/))) { res.chelka = +m[1]; res.gush = +m[2]; }
+  else if ((m = all.match(/גוש\s*:?\s*(\d+)\s*:?\s*חלקה\s*:?\s*(\d+)/))) { res.gush = +m[1]; res.chelka = +m[2]; }
+  m = all.match(/(\d{2}\/\d{2}\/\d{4})\s*תאריך/) || all.match(/תאריך\s*:?\s*(\d{2}\/\d{2}\/\d{4})/); if (m) res.date = m[1];
+  m = all.match(/(\d{4,})\s*נסח מס'/) || all.match(/נסח מס'\s*:?\s*(\d{4,})/); if (m) res.number = m[1];
+  m = all.match(/(מוסכם|מצוי)\s+(\d+)\s+([\d.,]+)\s+עיריית/); if (m) { res.takanon = m[1]; res.subsDeclared = +m[2]; res.lot = +m[3].replace(/,/g, ''); }
+  const addrRaw = rawLines.find(l => /כתובת:/.test(l));
+  if (addrRaw) res.address = addrRaw.replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, '').split(/\s{2,}/).map(x => x.trim()).filter(x => x && x !== 'כתובת:').reverse().join(' ').replace(/\s+,/g, ',').replace(/^,\s*|,\s*$/g, '').trim();
+
+  const isPageNoise = l => /^(\d{2}\/\d{2}\/\d{4}\s*תאריך|תאריך|שעה|.*נסח מס'|לשכת רישום|העתק רישום|נסח זה אינו|עמוד\s*\d|.*חלקה\s*:?\s*\d+\s*:?\s*גוש)/.test(l) || /^[א-ת"' ]+תשפ?"?[א-ת]$/.test(l) || /^שעה/.test(l) || /^\d{1,2}:\d{2}/.test(l);
+  const DEED = /(\d+\/\d{4}(?:\/\d+)?)/;
+  let unit = null, sec = null, lastNote = null;
+  const pushUnit = () => { if (unit) res.units.push(unit); };
+  for (const l of lines) {
+    if (isPageNoise(l)) continue;
+    let mm;
+    if ((mm = l.match(/^תת חלקה\s+(\d+)$/)) || (mm = l.match(/^(\d+)\s+תת חלקה$/))) { pushUnit(); unit = { id: +mm[1], share: null, floor: null, area: null, attach: [], owners: [], mortgages: [], notes: [] }; sec = 'head'; lastNote = null; continue; }
+    if (!unit) continue;
+    if (/^סוף נתונים/.test(l)) { sec = null; continue; }
+    if (/^החלק ברכוש המשותף/.test(l)) { sec = 'head'; continue; }
+    if (/^הצמדות$/.test(l)) { sec = 'attach'; continue; }
+    if (/^בעלויות$/.test(l)) { sec = 'own'; continue; }
+    if (/^משכנתאות$/.test(l)) { sec = 'mort'; continue; }
+    if (/^הערות$/.test(l)) { sec = 'notes'; lastNote = null; continue; }
+    if (/^חכירות$/.test(l)) { sec = 'lease'; continue; }
+    if (/שטח במ"ר.*תיאור הצמדה|תיאור הצמדה/.test(l)) continue;
+    if (sec === 'head' && (mm = l.match(/^(\d+\/\d+)\s+(.+?)\s+([\d.,]+)$/))) {
+      let fl = mm[2].trim(), q;
+      if ((q = fl.match(/^(\d+)\s+קומה$/))) fl = 'קומה ' + q[1];
+      else fl = fl.replace(/^(\d+\s+){1,2}(?=[א-ת])/, '');
+      unit.share = mm[1]; unit.floor = fl; unit.area = +mm[3].replace(/,/g, ''); continue;
+    }
+    if (sec === 'attach' && (mm = l.match(/^([\d.,]+)\s+(.+?)\s+(\S+)\s+(\S+)$/))) { unit.attach.push({ area: +mm[1].replace(/,/g, ''), desc: mm[2], mark: mm[4] }); continue; }
+    if (sec === 'own' && (mm = l.match(/^(\d+\/\d{4}(?:\/\d+)?)\s+(בשלמות|\d+\s*\/\s*\d+)\s+([\dA-Z-]+)\s+(ת\.ז|חברה|דרכון(?:\s+[א-ת]+)?|תאגיד|אחר)\s+(.+?)\s+(תיקון צו בית משותף|רישום בית משותף|צו קיום צוואה|צו ירושה|ירושה|צוואה|מכר ללא תמורה|מכר|מתנה|פירוק שיתוף|העברה ללא תמורה|העברת שכירות|הסכם|צו בית משפט|צו|\S+)$/))) {
+      unit.owners.push({ deed: mm[1], share: mm[2].replace(/\s/g, ''), id: mm[3], kind: mm[4], name: mm[5].trim(), how: mm[6].trim(), year: +mm[1].split('/')[1] }); continue;
+    }
+    if (sec === 'mort' && DEED.test(l)) {
+      mm = l.match(/^(\d+\/\d{4}(?:\/\d+)?)\s+(בשלמות|\d+\s*\/\s*\d+)?\s*([\dA-Z-]+)?\s*(ת\.ז|חברה)?\s*(.+?)\s+(משכנת\S*)$/);
+      unit.mortgages.push({ deed: l.match(DEED)[1], lender: mm ? mm[5].trim() : l.replace(DEED, '').trim(), year: +l.match(DEED)[1].split('/')[1] }); continue;
+    }
+    if (sec === 'notes') {
+      if (DEED.test(l)) {
+        const t = /הערת אזהרה/.test(l) ? 'warn' : /פקודת|המסים|עיקול/.test(l) ? 'lien' : /ירושה|צוואה/.test(l) ? 'estate' : 'other';
+        const typeTxt = t === 'warn' ? 'הערת אזהרה' + (/תמ"א/.test(l) ? ' תמ"א 38' : '') + (/126/.test(l) ? ' (סעיף 126)' : '') : (l.match(/(הערה לפי סעיף.*|עיקול.*|צו .*)$/) || [l.replace(DEED, '')])[0].trim();
+        mm = l.match(/(\d+\/\d{4}(?:\/\d+)?)\s+([\dA-Z-]+)\s+(ת\.ז|חברה|דרכון(?:\s+[א-ת]+)?)\s+(.+?)\s+(?:\d+\s+)?(הערת|הערה|עיקול|צו)/);
+        lastNote = { deed: l.match(DEED)[1], type: t, text: typeTxt, year: +l.match(DEED)[1].split('/')[1], benef: mm ? [{ id: mm[2], kind: mm[3], name: mm[4].trim() }] : [] };
+        unit.notes.push(lastNote); continue;
+      }
+      if (lastNote && (mm = l.match(/^([\dA-Z-]{5,})\s+(ת\.ז|חברה|דרכון(?:\s+[א-ת]+)?)\s+(.+)$/))) { lastNote.benef.push({ id: mm[1], kind: mm[2], name: mm[3].trim() }); continue; }
+      if (lastNote && /המסים|\(גביה\)|\)גביה\(/.test(l)) { lastNote.type = 'lien'; lastNote.text += ' (פקודת המסים, גבייה)'; continue; }
+      if (lastNote && (mm = l.match(/₪\s*([\d,]+)/))) { lastNote.amount = +mm[1].replace(/,/g, ''); continue; }
+    }
+  }
+  pushUnit();
+  // dedupe units (a unit can be split across pages; ids are unique)
+  const byId = new Map(); res.units.forEach(u => { const o = byId.get(u.id); if (!o) byId.set(u.id, u); else ['attach', 'owners', 'mortgages', 'notes'].forEach(k => o[k].push(...u[k])); });
+  res.units = [...byId.values()].sort((a, b) => a.id - b.id);
+  res.ok = !!(res.gush && res.chelka && res.units.length);
+  if (!res.consolidated) res.warnings.push('זה לא נראה כמו נסח מרוכז של בית משותף. ייתכן שחסרות דירות.');
+  if (res.subsDeclared && res.units.length !== res.subsDeclared) {
+    const have = new Set(res.units.map(u => u.id)), miss = [];
+    for (let i = 1; i <= Math.max(res.subsDeclared, ...have); i++) if (!have.has(i)) miss.push(i);
+    res.warnings.push(`בכותרת הנסח ${res.subsDeclared} תתי-חלקות, ונמצאו ${res.units.length}${miss.length ? ` (חסרות: ${miss.join(', ')})` : ''}. בדרך כלל זה אומר שתתי-חלקות אוחדו או בוטלו בתיקון צו הבית המשותף. בדקו במסמך.`);
+  }
+  const noOwner = res.units.filter(u => !u.owners.length).length;
+  if (noOwner) res.warnings.push(`ל-${noOwner} תתי-חלקות לא נקראו בעלים. בדקו במסמך.`);
+  return res;
+}
+
+/* Summary for the deal view: who controls what, and what blocks a deal. */
+function summarizeNesach(n) {
+  const U = n.units, ids = new Map();
+  U.forEach(u => u.owners.forEach(o => { const k = o.id || o.name; const e = ids.get(k) || { name: o.name, kind: o.kind, units: new Set() }; e.units.add(u.id); ids.set(k, e); }));
+  const owners = [...ids.values()].map(e => ({ ...e, units: [...e.units] })).sort((a, b) => b.units.length - a.units.length);
+  const benef = new Map();
+  U.forEach(u => u.notes.filter(x => x.type === 'warn').forEach(x => x.benef.forEach(b => { const k = b.id || b.name; const e = benef.get(k) || { name: b.name, kind: b.kind, units: new Set(), text: x.text, year: x.year }; e.units.add(u.id); e.year = Math.max(e.year, x.year); benef.set(k, e); })));
+  const warnBy = [...benef.values()].map(e => ({ ...e, units: [...e.units] })).sort((a, b) => b.units.length - a.units.length);
+  const warnUnits = U.filter(u => u.notes.some(x => x.type === 'warn')).length;
+  const companyWarn = warnBy.filter(b => b.kind === 'חברה');
+  const topCo = companyWarn[0] || null;
+  const basement = U.filter(u => /מרתף/.test(u.floor || ''));
+  const roof = [];
+  U.forEach(u => u.attach.filter(a => /גג/.test(a.desc)).forEach(a => roof.push({ unit: u.id, area: a.area })));
+  const liens = U.flatMap(u => u.notes.filter(x => x.type === 'lien').map(x => ({ unit: u.id, amount: x.amount || null })));
+  const mortUnits = U.filter(u => u.mortgages.length).length;
+  const lenders = [...new Set(U.flatMap(u => u.mortgages.map(m => m.lender)))];
+  const estate = U.filter(u => u.owners.some(o => /ירושה|צוואה/.test(o.how) && o.year >= 2018)).length;
+  return {
+    units: U.length, owners, ownerCount: owners.length, warnUnits, warnBy, topCo,
+    signedRatio: topCo ? topCo.units.length / U.length : 0,
+    basement: basement.map(u => ({ unit: u.id, area: u.area })), basementArea: basement.reduce((a, u) => a + (u.area || 0), 0),
+    roof, roofArea: roof.reduce((a, r) => a + r.area, 0), liens, mortUnits, lenders, estate,
+    totalArea: U.reduce((a, u) => a + (u.area || 0), 0)
+  };
+}
+
+
+let PDFJS_P = null;
+const PDFJS_BASE = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+function loadScript(src) { return new Promise((res, rej) => { const el = document.createElement('script'); el.src = src; el.onload = res; el.onerror = () => rej(new Error('load ' + src)); document.head.appendChild(el); }); }
+function loadPdfjs() {
+  if (!PDFJS_P) PDFJS_P = (async () => {
+    // Load the worker code on the main thread too: pdf.js then runs without a cross-origin Worker (works under strict CSP).
+    await loadScript(PDFJS_BASE + 'pdf.min.js');
+    await loadScript(PDFJS_BASE + 'pdf.worker.min.js');
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_BASE + 'pdf.worker.min.js';
+    return window.pdfjsLib;
+  })().catch(e => { PDFJS_P = null; throw e; });
+  return PDFJS_P;
+}
+async function readNesachFile(file) {
+  const lib = await loadPdfjs();
+  const doc = await lib.getDocument({ data: new Uint8Array(await file.arrayBuffer()), disableFontFace: true, isEvalSupported: false }).promise;
+  const lines = await nesachLines(doc);
+  const n = parseNesach(lines);
+  return { n, s: summarizeNesach(n) };
+}
+const fracVal = f => { const m = String(f || '').match(/(\d+)\s*\/\s*(\d+)/); return m ? +m[1] / +m[2] : f === 'בשלמות' ? 1 : null; };
+function nesachAi(NS, units) {
+  const s = NS.s, d = NS.n.date || '';
+  if (s.topCo && s.signedRatio >= 0.5) return `נסח טאבו מ-${d}: הערות אזהרה לטובת ${s.topCo.name} על ${s.topCo.units.length} מתוך ${s.units} דירות (${Math.round(s.signedRatio * 100)}%). יזם אחר כבר נעל את הבניין.`;
+  if (s.warnUnits) return `נסח טאבו מ-${d}: הערות אזהרה על ${s.warnUnits} מתוך ${s.units} דירות${s.topCo ? `, בעיקר לטובת ${s.topCo.name}` : ''}. יש מתחרה, אבל עוד אין רוב.`;
+  return `נסח טאבו מ-${d}: אין הערות אזהרה. ${s.ownerCount} בעלים שונים להחתמה${s.liens.length ? `, ${s.liens.length} עיקולים` : ''}${s.mortUnits ? `, משכנתאות על ${s.mortUnits} דירות` : ''}.`;
 }
 
 const PCACHE = new Map();
@@ -791,7 +959,7 @@ const INFO = {
   step4: 'הזדמנויות שלא נספרות במוקנה: איחוד חלקות, שחזור מרתף, הרחבות ובונוס גג. כל אחת מסומנת לפי החוזק המשפטי שלה.',
   step5: 'חלופת שקד (תקרה בחוק, לא זכות), סטטוס תמ״א 38 ותכניות חדשות שבדרך.',
   econ: 'רווח יזמי לפי הפרמטרים שהזנתם, לכל מסלול: הכנסות ממכירה פחות בנייה, רכות ומימון, תמורה לבעלים והיטל. הקרקע לא מתומחרת, כי היא ניתנת בתמורה לדירות.',
-  tabu: 'מספר תתי-החלקות, רישום הבית המשותף וסוג הבעלות הם נתונים אמיתיים מפנקסי המקרקעין. הערות אזהרה, משכנתאות, ירושות ושמות דורשים נסח טאבו.',
+  tabu: 'בלי נסח: מספר תתי-החלקות, רישום הבית המשותף וסוג הבעלות הם נתונים אמיתיים מפנקסי המקרקעין, והשאר הדגמה. עם נסח מרוכז שהעליתם: הערות אזהרה (מי היזם וכמה דירות הוא החתים), משכנתאות, עיקולים, ירושות, דירות במרתף והצמדות גג, כולם מהמסמך. הקובץ נקרא בדפדפן ונשמר בו בלבד. בגרסה ב-Claude הוא לא משותף, כדי ששמות ותעודות זהות לא יישמרו בשרת.',
   plans: 'תכניות שחלות על החלקה, בקשות והיתרי בנייה, ואזכורים בפרוטוקולי הוועדה מ-2025–2026, עם קישור למסמך.',
   market: 'מודעה שראיתם בבניין (ביד2, במדלן או אצל מתווך) מול ממוצע העסקאות בשכונה. אין סריקה אוטומטית של אתרי המודעות, כי תנאי השימוש שלהם אוסרים זאת והם חוסמים. בגרסה ב-Claude המודעות משותפות לכל מי שעורך את הכלי; באתר העצמאי הן נשמרות בדפדפן.',
   in_lotArea: 'שטח המגרש הרשום. קובע את סף 500 מ״ר ואת הרח״ק.',
@@ -1067,6 +1235,15 @@ function useListings() {
   };
   return [st, write];
 }
+function useNesach() {
+  const [v, setV] = useState(0);
+  const persist = () => { try { localStorage.setItem('israprop.nesach.v1', JSON.stringify(NESACH)); return true; } catch (e) { return false; } };
+  const save = (key, rec) => { NESACH = { ...NESACH, [key]: rec }; const ok = persist(); PCACHE.clear(); setV(x => x + 1); return ok; };
+  const remove = key => { const m = { ...NESACH }; delete m[key]; NESACH = m; persist(); PCACHE.clear(); setV(x => x + 1); };
+  return [v, save, remove];
+}
+const NesachCtx = React.createContext({ save: () => false, remove: () => {} });
+
 const ListingCtx = React.createContext({ st: { src: 'local' }, write: async () => ({ ok: false }) });
 
 function ListingForm({ p, onDone }) {
@@ -2105,11 +2282,11 @@ function AboutModal({ onClose, onOpenDev }) {
         <section className="grid sm:grid-cols-2 gap-3">
           <div className="rounded-lg border border-line p-3 grid gap-1.5">
             <div className="text-[12.5px] font-bold text-go-ink">נתונים אמיתיים</div>
-            {bullets(['חלקות, מבנים, שימור ואזור ההכרזה (GIS עירוני)', 'היתרים, בקשות ותכניות', 'פרוטוקולי הוועדה 2025–2026', 'מספר בעלים וסוג בעלות (פנקסי המקרקעין)', 'מחירי ייחוס לשכונה (נדל״ן.gov.il)', 'מודעות שאתם מזינים, מול מחירי השכונה'], '#10B981')}
+            {bullets(['חלקות, מבנים, שימור ואזור ההכרזה (GIS עירוני)', 'היתרים, בקשות ותכניות', 'פרוטוקולי הוועדה 2025–2026', 'מספר בעלים וסוג בעלות (פנקסי המקרקעין)', 'מחירי ייחוס לשכונה (נדל״ן.gov.il)', 'מודעות שאתם מזינים, מול מחירי השכונה', 'נסח טאבו שאתם מעלים: הערות אזהרה, משכנתאות, עיקולים, מרתפים וגג'], '#10B981')}
           </div>
           <div className="rounded-lg border border-line p-3 grid gap-1.5">
             <div className="text-[12.5px] font-bold text-act-ink">עדיין לא, או הדגמה</div>
-            {bullets(['הערות אזהרה, משכנתאות ושמות בעלים: דורשים נסח טאבו', 'מרתפים ובנייה על הגג: הזנה ידנית'], '#F59E0B')}
+            {bullets(['פרטי טאבו לדירות: רק אחרי שמעלים נסח לבניין', 'בנייה קיימת על הגג: הזנה ידנית'], '#F59E0B')}
           </div>
         </section>
 
@@ -2187,8 +2364,8 @@ const Section = ({ title, eyebrow, icon, children, info }) => (
     {children}
   </section>
 );
-const NOTE_LABEL = { warn126: 'הערת אזהרה', mortgage: 'משכנתא', estate: 'עזבון', roof: 'צמוד גג' };
-const NOTE_STYLE = { warn126: 'bg-skip-soft text-skip-ink', mortgage: 'bg-line-soft text-ink-2', estate: 'bg-act-soft text-act-ink', roof: 'bg-accent-soft text-accent' };
+const NOTE_LABEL = { warn126: 'הערת אזהרה', mortgage: 'משכנתא', estate: 'ירושה', roof: 'צמוד גג', lien: 'עיקול', basement: 'מרתף' };
+const NOTE_STYLE = { warn126: 'bg-skip-soft text-skip-ink', mortgage: 'bg-line-soft text-ink-2', estate: 'bg-act-soft text-act-ink', roof: 'bg-accent-soft text-accent', lien: 'bg-stop-soft text-stop', basement: 'bg-canvas text-ink-2' };
 
 function LegalRow({ ok, warn, title, detail }) {
   const tone = ok ? 'text-go-ink bg-go-soft' : warn ? 'text-act-ink bg-act-soft' : 'text-stop bg-stop-soft';
@@ -2282,6 +2459,120 @@ function CtxSection({ p }) {
   );
 }
 
+function NesachUpload({ p, compact }) {
+  const { save } = React.useContext(NesachCtx);
+  const [busy, setBusy] = useState(false), [msg, setMsg] = useState(null);
+  const onFile = async e => {
+    const f = e.target.files && e.target.files[0]; e.target.value = '';
+    if (!f) return;
+    setBusy(true); setMsg(null);
+    try {
+      const r = await readNesachFile(f);
+      if (!r.n.ok) { setMsg({ err: true, t: 'לא הצלחתי לקרוא את הקובץ כנסח טאבו. ודאו שזה נסח מקורי מהאתר של רשות המקרקעין (לא סריקה או צילום).' }); return; }
+      if (r.n.gush !== p.gush || r.n.chelka !== p.chelka) { setMsg({ err: true, t: `הנסח הוא של גוש ${r.n.gush} חלקה ${r.n.chelka}, לא של הבניין הזה (גוש ${p.gush} חלקה ${p.chelka}).` }); return; }
+      const ok = save(`${p.gush}-${p.chelka}`, { n: r.n, s: r.s, file: f.name, loadedAt: new Date().toISOString().slice(0, 10) });
+      setMsg(ok ? null : { err: true, t: 'הקריאה הצליחה, אבל הדפדפן לא שומר נתונים (מצב פרטי?). הנתונים יוצגו עד רענון הדף.' });
+    } catch (err) { setMsg({ err: true, t: 'טעינת קורא ה-PDF נכשלה. בדקו את החיבור לאינטרנט ונסו שוב.' }); }
+    finally { setBusy(false); }
+  };
+  return (
+    <div className={compact ? '' : 'mb-2'}>
+      <label className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-[12.5px] font-semibold cursor-pointer ${busy ? 'bg-line-soft text-ink-3' : 'bg-accent text-white hover:opacity-90'}`}>
+        <Icon name="filedown" className="w-4 h-4" />{busy ? 'קורא את הנסח…' : compact ? 'החלפת נסח' : 'העלאת נסח טאבו (PDF)'}
+        <input type="file" accept="application/pdf,.pdf" className="sr-only" onChange={onFile} disabled={busy} />
+      </label>
+      {msg && <div className={`mt-1.5 text-2xs rounded-md px-2 py-1 ${msg.err ? 'bg-stop-soft text-stop' : 'bg-go-soft text-go-ink'}`}>{msg.t}</div>}
+    </div>
+  );
+}
+
+function TabuSection({ p, legalSigned }) {
+  const { remove } = React.useContext(NesachCtx);
+  const NS = p.nesach;
+  if (!NS) return (
+    <Section info="tabu" eyebrow="טאבו" title="בדיקה משפטית וחלק בקרקע" icon="key">
+      <div className="mb-2 rounded-lg border border-dashed border-line p-2.5">
+        <div className="text-[12px] text-ink-2 mb-2">העלו נסח טאבו מרוכז (PDF מהאתר של רשות המקרקעין), והכלי יקרא ממנו הערות אזהרה, משכנתאות, עיקולים, בעלים, דירות במרתף והצמדות גג. הקובץ נקרא בדפדפן שלכם ונשמר בו בלבד: שמות ותעודות זהות לא נשלחים לשום מקום.</div>
+        <NesachUpload p={p} />
+      </div>
+      <div className="mb-2 text-2xs rounded-md bg-act-soft text-act-ink px-2 py-1">עד שיועלה נסח: מספר תתי-החלקות, רישום הבית המשותף וסוג הבעלות הם נתונים אמיתיים (data.gov.il). שאר הסעיף מטה הוא הדגמה.</div>
+                    <div className="divide-y divide-line-soft">
+            <LegalRow ok={!legalSigned} warn={p.status === 'file'}
+              title={legalSigned ? `נמצאו ${legalSigned} הערות אזהרה (סעיף 126)` : 'אין הערות אזהרה לטובת יזם (סעיף 126)'}
+              detail={legalSigned ? `לטובת ${p.developer}. ${legalSigned >= Math.ceil(p.units * 2 / 3) ? 'מעל רוב של שני שלישים: הזכויות נעולות.' : 'עדיין מתחת לרוב הנדרש.'}` : `נבדקו ${p.units} תתי-חלקות בנסח מ-01/11/2026.`} />
+            <LegalRow ok={p.condoRegistered} warn={!p.condoRegistered} title={p.condoRegistered ? 'בית משותף רשום' : 'בית משותף לא רשום'} detail={p.condoRegistered ? 'צו רישום ותקנון קיימים. חלקי הרכוש המשותף מוגדרים.' : 'נדרש רישום לפני חתימה עם יזם. מאריך את לוח הזמנים.'} />
+            {p.ownReal && <LegalRow ok={!p.nonPrivate.length} warn={!!p.nonPrivate.length} title={`סוג בעלות: ${p.ownTypes.join(', ')}`} detail={p.nonPrivate.length ? 'חלק מהזכויות אינן פרטיות. בעלות מדינה עשויה להיות חכירה מרמ״י, שמחייבת הסכמה ודמי היתר. בדקו בנסח.' : p.condoRegistered ? `בעלות פרטית. ${p.units} תתי-חלקות רשומות, כלומר ${p.units} בעלי זכויות לפחות להחתמה.` : `בעלות פרטית. אין תתי-חלקות רשומות, ולכן מספר הדירות (${p.units}) הוא הערכה.`} />}
+            <LegalRow ok={!p.roofAttached} warn={p.roofAttached} title={p.roofAttached ? `זכויות הגג צמודות לתת-חלקה ${p.units}` : 'זכויות הגג ברכוש המשותף'} detail={p.roofAttached ? 'בעל הדירה העליונה מחזיק בזכויות הבנייה על הגג. רכישת דירה אחרת לא מקנה אותן.' : 'כל הבעלים חולקים את הזכויות לפי החלק בקרקע.'} />
+            {p.estate && <LegalRow ok={false} warn title="עזבון / ירושה פתוחה" detail="אחת הדירות רשומה על שם נפטר. מוכרים מעזבון נוטים למכור מהר ומתחת לשוק." />}
+            <LegalRow ok={!p.lien} warn={false} title={p.lien ? 'נמצא עיקול על תת-חלקה' : 'אין עיקולים'} detail={p.mortgages ? `${p.mortgages} משכנתאות רשומות (רגיל).` : 'אין משכנתאות רשומות.'} />
+          </div>
+
+          <div className="mt-3">
+            <div className="flex items-center justify-between mb-1.5"><span className="eyebrow">חלק בקרקע לפי דירה · הדגמה</span><span className="text-2xs text-ink-3">שטח רשום · מ״ר</span></div>
+            <div className="border border-line rounded-lg overflow-hidden">
+              <div className="max-h-48 overflow-y-auto scroll-thin">
+                <table className="w-full text-2xs">
+                  <thead className="sticky top-0 bg-canvas text-ink-3"><tr className="[&>th]:px-2 [&>th]:py-1.5 [&>th]:text-start [&>th]:font-semibold"><th>תת-חלקה</th><th>קומה</th><th>שטח</th><th>חלק בקרקע</th><th>הערות</th></tr></thead>
+                  <tbody>
+                    {p.unitList.map(u => (
+                      <tr key={u.id} className="border-t border-line-soft [&>td]:px-2 [&>td]:py-1">
+                        <td><Num className="font-semibold text-ink">{u.id}</Num></td>
+                        <td className="text-ink-2">{u.floor === 0 ? 'קרקע' : <Num>{u.floor}</Num>}</td>
+                        <td><Num>{u.area}</Num></td>
+                        <td><div className="flex items-center gap-1.5"><Num className="w-10">{pct(u.share, 1)}</Num><span className="h-1 w-10 bg-line-soft rounded-full overflow-hidden"><span className="block h-full bg-accent/70 rounded-full" style={{ width: `${u.share * p.units * 50}%` }} /></span></div></td>
+                        <td><div className="flex flex-wrap gap-1">{u.notes.map(n => <span key={n} className={`px-1 rounded ${NOTE_STYLE[n]}`}>{NOTE_LABEL[n]}</span>)}</div></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+    </Section>
+  );
+  const S = NS.s, n = NS.n;
+  const Stat = ({ l, v, sub, tone = 'text-ink' }) => <div className="bg-white p-2 min-w-0"><div className="text-2xs text-ink-3">{l}</div><div className={`text-[15px] font-bold leading-tight ${tone}`}>{v}</div>{sub && <div className="text-2xs text-ink-3 truncate">{sub}</div>}</div>;
+  return (
+    <Section info="tabu" eyebrow="טאבו · נסח אמיתי" title="בדיקה משפטית וחלק בקרקע" icon="key">
+      <div className="mb-2 flex flex-wrap items-center gap-2 justify-between">
+        <div className="text-2xs text-ink-2">נסח מרוכז מ-<Num>{n.date}</Num>{n.number && <> · מס׳ <Num>{n.number}</Num></>} · נשמר בדפדפן הזה בלבד</div>
+        <div className="flex gap-2"><NesachUpload p={p} compact /><Btn variant="ghost" className="h-8 px-2.5" onClick={() => remove(`${p.gush}-${p.chelka}`)}>מחיקה</Btn></div>
+      </div>
+      {n.warnings.map((w, i) => <div key={i} className="mb-1.5 text-2xs rounded-md bg-act-soft text-act-ink px-2 py-1">{w}</div>)}
+      <div className="grid grid-cols-3 gap-px bg-line rounded-lg overflow-hidden border border-line mb-2">
+        <Stat l="דירות (תתי-חלקות)" v={<Num>{S.units}</Num>} sub={`${n0(S.totalArea)} מ״ר רשומים`} />
+        <Stat l="בעלים להחתמה" v={<Num>{S.ownerCount}</Num>} sub={S.owners[0] && S.owners[0].units.length > 1 ? `הגדול מחזיק ${S.owners[0].units.length} דירות` : 'בעלים שונים'} />
+        <Stat l="הערות אזהרה" v={<Num>{S.warnUnits}</Num>} sub={S.topCo ? `${Math.round(S.signedRatio * 100)}% לטובת חברה` : 'אין לטובת חברה'} tone={S.signedRatio >= 0.5 ? 'text-stop' : S.warnUnits ? 'text-act-ink' : 'text-go-ink'} />
+      </div>
+      <div className="divide-y divide-line-soft">
+        {S.warnBy.length > 0 ? S.warnBy.filter(b => b.kind === 'חברה').slice(0, 3).map(b => (
+          <LegalRow key={b.name} ok={false} warn={b.units.length / S.units < 0.5} title={`הערות אזהרה לטובת ${b.name}: ${b.units.length} מתוך ${S.units} דירות`} detail={b.units.length / S.units >= 2 / 3 ? 'מעל שני שלישים: יזם אחר כבר נעל את הבניין. לא כדאי להתחרות.' : b.units.length / S.units >= 0.5 ? 'מעל חצי מהדירות: יזם אחר מתקדם. סיכוי נמוך להתחרות.' : 'יזם התחיל להחתים, אבל אין לו רוב. אפשר עוד להתחרות.'} />
+        )) : <LegalRow ok title="אין הערות אזהרה לטובת יזם" detail="אף חברה לא רשמה הערת אזהרה על הדירות. אין סימן ליזם חתום." />}
+        {S.warnBy.filter(b => b.kind !== 'חברה').length > 0 && S.warnBy.filter(b => b.kind === 'חברה').length === 0 && <LegalRow warn ok={false} title={`הערות אזהרה לטובת אנשים פרטיים על ${S.warnUnits} דירות`} detail="בדרך כלל רוכש דירה שעוד לא השלים רישום. בדקו במסמך." />}
+        <LegalRow ok={!S.mortUnits} warn={!!S.mortUnits} title={S.mortUnits ? `משכנתאות על ${S.mortUnits} דירות (${S.lenders.length} מלווים)` : 'אין משכנתאות'} detail={S.mortUnits ? 'רגיל. בפרויקט צריך הסכמת הבנק ומכתבי החרגה, וזה מאריך את הליווי.' : 'אין שעבודים רשומים.'} />
+        <LegalRow ok={!S.liens.length} warn={false} title={S.liens.length ? `${S.liens.length} עיקולים או הערות לפי פקודת המסים` : 'אין עיקולים'} detail={S.liens.length ? `סכום רשום: ${S.liens.filter(x => x.amount).map(x => ils(x.amount)).join(', ') || 'לא צוין'}. צריך לסלק לפני העברת זכויות.` : 'לא נמצאו הערות עיקול או גבייה.'} />
+        <LegalRow ok={!S.estate} warn={!!S.estate} title={S.estate ? `${S.estate} דירות שעברו בירושה או בצוואה מאז 2018` : 'אין ירושות אחרונות'} detail={S.estate ? 'יורשים נוטים להיות פתוחים לעסקה, ולפעמים גם למכירה מהירה.' : 'אין העברות בירושה בשנים האחרונות.'} />
+        <LegalRow ok={!S.roof.length} warn={!!S.roof.length} title={S.roof.length ? `הצמדת גג לתת-חלקה ${[...new Set(S.roof.map(r => r.unit))].join(', ')} (${n0(S.roofArea)} מ״ר)` : 'אין הצמדות גג'} detail={S.roof.length ? 'בעל הדירה הזו מחזיק בגג. בתוספת קומות צריך את הסכמתו, והוא יבקש תמורה גבוהה יותר.' : 'הגג ברכוש המשותף.'} />
+        <LegalRow ok warn={false} title={S.basement.length ? `${S.basement.length} דירות במרתף (${n0(S.basementArea)} מ״ר)` : 'אין דירות רשומות במרתף'} detail={S.basement.length ? 'נכנס לחישוב הזכויות כמרתף בהיתר (שחזור במרתף החדש). ודאו בתיק הבניין שהשימוש העיקרי היה בהיתר.' : 'אין שטח מרתף רשום כדירה.'} />
+      </div>
+      <div className="mt-3">
+        <div className="flex items-center justify-between mb-1.5"><span className="eyebrow">דירות לפי הנסח</span><span className="text-2xs text-ink-3">שמות מוצגים רק בדפדפן הזה</span></div>
+        <div className="border border-line rounded-lg overflow-hidden"><div className="max-h-64 overflow-y-auto scroll-thin">
+          <table className="w-full text-2xs">
+            <thead className="sticky top-0 bg-canvas text-ink-3"><tr className="[&>th]:px-2 [&>th]:py-1.5 [&>th]:text-start [&>th]:font-semibold"><th>תת-חלקה</th><th>קומה</th><th>שטח</th><th>חלק ברכוש</th><th>בעלים</th><th>הערות</th></tr></thead>
+            <tbody>{p.unitList.map(u => (
+              <tr key={u.id} className="border-t border-line-soft [&>td]:px-2 [&>td]:py-1 align-top">
+                <td><Num className="font-semibold text-ink">{u.id}</Num></td><td className="text-ink-2">{u.floor}</td><td><Num>{u.area}</Num></td><td><Num>{u.shareTxt}</Num></td>
+                <td className="text-ink-2 max-w-[140px]">{u.owners}</td>
+                <td><div className="flex flex-wrap gap-1">{u.notes.map(t => <span key={t} className={`px-1 rounded ${NOTE_STYLE[t] || 'bg-line-soft text-ink-2'}`}>{NOTE_LABEL[t] || t}</span>)}</div></td>
+              </tr>))}</tbody>
+          </table>
+        </div></div>
+      </div>
+    </Section>
+  );
+}
+
 function Inspector({ onOpenDev, p, onClose, onExport, onSave, saved, onContact, overlay, onOverride, onReset, openRule }) {
   const st = STATUS[p.status];
   const legalSigned = p.unitList.filter(u => u.notes.includes('warn126')).length;
@@ -2332,41 +2623,7 @@ function Inspector({ onOpenDev, p, onClose, onExport, onSave, saved, onContact, 
 
         <CtxSection p={p} />
 
-        <Section info="tabu" eyebrow="טאבו" title="בדיקה משפטית וחלק בקרקע" icon="key">
-          <div className="mb-2 text-2xs rounded-md bg-act-soft text-act-ink px-2 py-1">מספר תתי-החלקות, רישום הבית המשותף וסוג הבעלות: פנקסי המקרקעין (data.gov.il), נתון אמיתי. הערות אזהרה, משכנתאות ושמות בעלים דורשים נסח טאבו (לא נשלף), ולכן שאר הסעיף הוא הדגמה.</div>
-          <div className="divide-y divide-line-soft">
-            <LegalRow ok={!legalSigned} warn={p.status === 'file'}
-              title={legalSigned ? `נמצאו ${legalSigned} הערות אזהרה (סעיף 126)` : 'אין הערות אזהרה לטובת יזם (סעיף 126)'}
-              detail={legalSigned ? `לטובת ${p.developer}. ${legalSigned >= Math.ceil(p.units * 2 / 3) ? 'מעל רוב של שני שלישים: הזכויות נעולות.' : 'עדיין מתחת לרוב הנדרש.'}` : `נבדקו ${p.units} תתי-חלקות בנסח מ-01/11/2026.`} />
-            <LegalRow ok={p.condoRegistered} warn={!p.condoRegistered} title={p.condoRegistered ? 'בית משותף רשום' : 'בית משותף לא רשום'} detail={p.condoRegistered ? 'צו רישום ותקנון קיימים. חלקי הרכוש המשותף מוגדרים.' : 'נדרש רישום לפני חתימה עם יזם. מאריך את לוח הזמנים.'} />
-            {p.ownReal && <LegalRow ok={!p.nonPrivate.length} warn={!!p.nonPrivate.length} title={`סוג בעלות: ${p.ownTypes.join(', ')}`} detail={p.nonPrivate.length ? 'חלק מהזכויות אינן פרטיות. בעלות מדינה עשויה להיות חכירה מרמ״י, שמחייבת הסכמה ודמי היתר. בדקו בנסח.' : p.condoRegistered ? `בעלות פרטית. ${p.units} תתי-חלקות רשומות, כלומר ${p.units} בעלי זכויות לפחות להחתמה.` : `בעלות פרטית. אין תתי-חלקות רשומות, ולכן מספר הדירות (${p.units}) הוא הערכה.`} />}
-            <LegalRow ok={!p.roofAttached} warn={p.roofAttached} title={p.roofAttached ? `זכויות הגג צמודות לתת-חלקה ${p.units}` : 'זכויות הגג ברכוש המשותף'} detail={p.roofAttached ? 'בעל הדירה העליונה מחזיק בזכויות הבנייה על הגג. רכישת דירה אחרת לא מקנה אותן.' : 'כל הבעלים חולקים את הזכויות לפי החלק בקרקע.'} />
-            {p.estate && <LegalRow ok={false} warn title="עזבון / ירושה פתוחה" detail="אחת הדירות רשומה על שם נפטר. מוכרים מעזבון נוטים למכור מהר ומתחת לשוק." />}
-            <LegalRow ok={!p.lien} warn={false} title={p.lien ? 'נמצא עיקול על תת-חלקה' : 'אין עיקולים'} detail={p.mortgages ? `${p.mortgages} משכנתאות רשומות (רגיל).` : 'אין משכנתאות רשומות.'} />
-          </div>
-
-          <div className="mt-3">
-            <div className="flex items-center justify-between mb-1.5"><span className="eyebrow">חלק בקרקע לפי דירה · הדגמה</span><span className="text-2xs text-ink-3">שטח רשום · מ״ר</span></div>
-            <div className="border border-line rounded-lg overflow-hidden">
-              <div className="max-h-48 overflow-y-auto scroll-thin">
-                <table className="w-full text-2xs">
-                  <thead className="sticky top-0 bg-canvas text-ink-3"><tr className="[&>th]:px-2 [&>th]:py-1.5 [&>th]:text-start [&>th]:font-semibold"><th>תת-חלקה</th><th>קומה</th><th>שטח</th><th>חלק בקרקע</th><th>הערות</th></tr></thead>
-                  <tbody>
-                    {p.unitList.map(u => (
-                      <tr key={u.id} className="border-t border-line-soft [&>td]:px-2 [&>td]:py-1">
-                        <td><Num className="font-semibold text-ink">{u.id}</Num></td>
-                        <td className="text-ink-2">{u.floor === 0 ? 'קרקע' : <Num>{u.floor}</Num>}</td>
-                        <td><Num>{u.area}</Num></td>
-                        <td><div className="flex items-center gap-1.5"><Num className="w-10">{pct(u.share, 1)}</Num><span className="h-1 w-10 bg-line-soft rounded-full overflow-hidden"><span className="block h-full bg-accent/70 rounded-full" style={{ width: `${u.share * p.units * 50}%` }} /></span></div></td>
-                        <td><div className="flex flex-wrap gap-1">{u.notes.map(n => <span key={n} className={`px-1 rounded ${NOTE_STYLE[n]}`}>{NOTE_LABEL[n]}</span>)}</div></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </Section>
+        <TabuSection p={p} legalSigned={legalSigned} />
 
         <Section info="plans" eyebrow="צנרת תכנונית" title="תכניות חלות ופרוטוקולי ועדה" icon="file">
           <div className="flex flex-wrap gap-1.5 mb-3">
@@ -2521,6 +2778,7 @@ const useMedia = q => { const [m, setM] = useState(() => window.matchMedia(q).ma
 function App() {
   const [dev, saveDev] = useDevParams();
   const [lst, writeListing] = useListings();
+  const [nv, saveNesach, removeNesach] = useNesach();
   const [devOpen, setDevOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(() => { try { return !localStorage.getItem('israprop.about.seen'); } catch (e) { return true; } });
   const closeAbout = () => { setAboutOpen(false); try { localStorage.setItem('israprop.about.seen', '1'); } catch (e) {} };
@@ -2531,7 +2789,7 @@ function App() {
   const [overrides, setOverrides] = useState({});
   const [extra, setExtra] = useState(null);
   const [rulesFocus, setRulesFocus] = useState(null);
-  const parcels = useMemo(() => scan.map(s => genParcelC(s.streetId, s.num, s.idx, s.total, overrides[`${s.streetId}-${s.num}`])), [scan, overrides, lst.v]);
+  const parcels = useMemo(() => scan.map(s => genParcelC(s.streetId, s.num, s.idx, s.total, overrides[`${s.streetId}-${s.num}`])), [scan, overrides, lst.v, nv]);
   const [scanning, setScanning] = useState(false);
   const [scanStep, setScanStep] = useState(0);
   const [chips, setChips] = useState([]);
@@ -2593,7 +2851,7 @@ function App() {
   const visibleIds = useMemo(() => new Set(rows.map(r => r.id)), [rows]);
 
   const parcelsById = useMemo(() => Object.fromEntries(parcels.map(p => [p.id, p])), [parcels]);
-  const extraParcel = useMemo(() => extra ? genParcelC(extra.streetId, extra.num, extra.idx, extra.total, overrides[`${extra.streetId}-${extra.num}`]) : null, [extra, overrides, lst.v]);
+  const extraParcel = useMemo(() => extra ? genParcelC(extra.streetId, extra.num, extra.idx, extra.total, overrides[`${extra.streetId}-${extra.num}`]) : null, [extra, overrides, lst.v, nv]);
   const selected = selectedId ? (parcelsById[selectedId] || (extraParcel && extraParcel.id === selectedId ? extraParcel : null)) : null;
   if (selected && !selected.econ) selected.econ = econ(selected, dev.values);
   const selectP = p => setSelectedId(p.id);
@@ -2621,6 +2879,7 @@ function App() {
 
   return (
     <ListingCtx.Provider value={{ st: lst, write: writeListing }}>
+    <NesachCtx.Provider value={{ save: saveNesach, remove: removeNesach }}>
     <div className="app flex flex-col">
       <Header onOpenAbout={() => setAboutOpen(true)} onOpenDev={() => setDevOpen(true)} devMissing={dev.src !== 'loading' && !dev.values} onOpenRules={() => setRulesFocus('all')} query={query} setQuery={setQuery} onScan={onScan} scanning={scanning} scanStep={scanStep} scanTarget={target}
         chips={chips} toggleChip={toggleChip} pipeline={pipeline} onOpenParcel={openFromPipeline} parcelsById={parcelsById}
@@ -2662,6 +2921,7 @@ function App() {
         {toasts.map(t => <div key={t.id} className="anim-fade bg-ink text-white text-[12.5px] font-semibold px-3.5 py-2 rounded-lg shadow-pop flex items-center gap-2"><Icon name="check" className="w-4 h-4 text-go" stroke={2.4} />{t.msg}</div>)}
       </div>
     </div>
+    </NesachCtx.Provider>
     </ListingCtx.Provider>
   );
 }
