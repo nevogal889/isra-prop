@@ -250,7 +250,8 @@ function computeRights(x) {
   const dEx = x.typ / wEx;
   const cap65 = decl || x.rova === '5-6' || x.rova === 'ig';
   // Roof floor: new building 3 m front + 2 m rear setback; addition 3 m front, rest per contour. 65% cap only in the declared area.
-  const roofNewSet = Math.round(g ? g.br[1] : wNew * Math.max(0, dNew - 5));
+  // roof floor follows the typical floor: when the coverage cap shrinks the floor plate, the roof floor shrinks in proportion, and it can never exceed the floor below
+  const roofNewSet = Math.round(Math.min(typNew, g ? g.br[1] * (typNew / Math.max(1, g.bn[1])) : wNew * Math.max(0, dNew - 5)));
   const roofNew = Math.round(cap65 ? Math.min(0.65 * typNew, roofNewSet) : roofNewSet);
   const roofAddSet = Math.round(wEx * Math.max(0, dEx - 3));
   const roofAdd = Math.round(cap65 ? Math.min(0.65 * x.typ, roofAddSet) : roofAddSet);
