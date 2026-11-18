@@ -460,6 +460,7 @@ async function loadData() {
   try { MENTIONS = await (await fetch('mentions.json')).json(); } catch (e) { MENTIONS = {}; }
   try { NADLAN = await (await fetch('nadlan.json')).json(); } catch (e) { NADLAN = null; }
   try { CTX = await (await fetch('context.json')).json(); } catch (e) { CTX = null; }
+  try { SUNW = await (await fetch('sunwind.json')).json(); } catch (e) { SUNW = null; }
   const zones = Object.entries(AREA_BY_ZONE).map(([z, arr]) => ({ type: 'area', id: z, he: `סריקת ${ZONE_META[z].label}`, sub: `${arr.length.toLocaleString('en-US')} חלקות · המובילות`, aliases: [ZONE_META[z].label, ZONE_META[z].hood, 'רובע ' + z, 'סריקה'] }));
   const streets = Object.entries(AREA_STREETS).map(([st, arr]) => ({ type: 'street', id: st, he: st, sub: `${ZONE_META[modeOf(arr.map(r => r.area))].label} · ${arr.length} חלקות`, aliases: [st, ...(STREET_EN[st] || [])], n: arr.length })).sort((x, y) => y.n - x.n);
   SEARCH_INDEX = [...zones, ...streets];
@@ -936,6 +937,7 @@ const Icon = ({ name, className = 'w-4 h-4', stroke = 1.8 }) => (
    4b. INFO TIPS
    ========================================================================= */
 const INFO = {
+  sunwind: 'שמש ישירה לכל קומה בבניין שהתכנית מתירה, לפי מיקום השמש והגובה האמיתי של הבניינים מסביב (מדידת לייזר של העירייה), ומדד חשיפה לבריזת הים. מתעדכן כל שבוע. בכלכלה הוא משפיע רק אם הגדרתם פרמיה בפרמטרים היזמיים.',
   explain: 'אותו חישוב כמו בשכבות שמתחת, בשפה פשוטה. ליד כל מספר כתוב מאיפה הוא: מהמפה העירונית, מהתכנית, הנחה של הכלי, או תוצאה של חישוב. הנחה היא המקום שבו המספר יכול לטעות.',
   st_order: 'שלב 1 במשפך: לפי הנתונים הציבוריים הבניין שווה בדיקה. אין היתר, בקשה או סימן ליזם, ובנוסף: אם הזנתם פרמטרים יזמיים, הרווח עובר את הסף המינימלי שלכם; אם לא, יש תוספת מאומתת של 600 מ״ר ומעלה (כ-6 דירות חדשות). הטאבו עוד לא נבדק: יזם שהחתים דיירים ולא הגיש כלום לא מופיע בשום מקור ציבורי. הצעד הבא: להזמין נסח מרוכז ולהעלות אותו בסעיף הטאבו.',
   st_clean: 'שלב 2 במשפך: הועלה נסח, ואין עליו הערות אזהרה לטובת חברה. זה הבניין שעליו יוצאים לסיור ופונים לבעלים. עדיין כדאי לבדוק את תיק הבניין בעירייה ולקבל חוות דעת שמאי ועורך דין.',
@@ -1177,6 +1179,9 @@ const DEV_GROUPS = [
     { k: 'purchaseTax', label: 'מס רכישה', unit: '₪', ph: '1,300,000' },
     { k: 'financing', label: 'מימון, ערבויות חוק מכר וביטוח', unit: '₪', ph: '2,500,000' },
     { k: 'overhead', label: 'תקורה', unit: '% מסך העלויות', ph: '1' }] },
+  { title: 'שמש ורוח במחיר (לא חובה)', note: 'כמה אתם מעריכים שקונים מוסיפים על דירה שטופת שמש בחורף, או פתוחה לבריזה. אין נתוני שוק לכיול, ולכן זו ההערכה שלכם. ריק = בלי השפעה.', fields: [
+    { k: 'sunPrem', label: 'פרמיה מרבית לבניין שטוף שמש בחורף', unit: '% מהמחיר', ph: '3', h: 'ניתנת במלואה לבניין שבו כל החזיתות בכל הקומות מקבלות 3 שעות שמש ויותר ב-21 בדצמבר, ובחלקה לפי החלק שמקבל.' },
+    { k: 'breezePrem', label: 'פרמיה מרבית לחשיפה מלאה לבריזה', unit: '% מהמחיר', ph: '2', h: 'ניתנת במלואה במדד בריזה 10, ובחלקה לפי המדד.' }] },
   { title: 'סף החלטה', fields: [
     { k: 'minProfit', label: 'רווח יזמי מינימלי', unit: '% מסך העלויות', ph: '25' },
     { k: 'equity', label: 'הון עצמי', unit: '₪', ph: '8,000,000', h: 'לחישוב תשואה על ההון העצמי. לא חובה.' }] }
@@ -1226,7 +1231,8 @@ function feasCompute(F, dev) {
     const eqTot = num0(u.net) + balcEq + num0(u.out) * c + (u.roofTop ? num0(u.roofTop) * num0(dev.eqRoof) / 100 : 0);
     return { ...u, coefUsed: c * 100, eq: Math.round(eqTot), value: u.owner ? 0 : Math.round(eqTot * num0(u.price)) };
   });
-  const revenue = rows.reduce((a, r) => a + r.value, 0), revEx = revenue / VAT;
+  const swMult = F.swMult || 1;
+  const revenue = rows.reduce((a, r) => a + r.value, 0) * swMult, revEx = revenue / VAT;
   const C = { ...F.costs };
   const balcM2 = rows.reduce((a, r) => a + num0(r.balc) * (r.n || 1), 0);
   const construction = num0(F.gross) * num0(C.costRebuild) + num0(F.basement) * num0(C.costBasement) + balcM2 * num0(C.costBalc) + num0(C.demolition);
@@ -1238,7 +1244,7 @@ function feasCompute(F, dev) {
   const overhead = sub * num0(C.overhead) / 100;
   const cost = sub + overhead, profit = revEx - cost;
   const zero = COST_KEYS.filter(k => !num0(C[k]) && !['contingency', 'overhead', 'lawDev', 'marketing'].includes(k));
-  return { rows, revenue, revEx, balcM2, construction, contingency, owners, fixed, pctItems, overhead, cost, profit,
+  return { swMult, rows, revenue, revEx, balcM2, construction, contingency, owners, fixed, pctItems, overhead, cost, profit,
     pct: cost > 0 ? profit / cost : 0, pctSales: revEx > 0 ? profit / revEx : 0, roe: num0(dev.equity) ? profit / num0(dev.equity) : null, zero };
 }
 
@@ -1252,7 +1258,9 @@ function econ(p, dev) {
   const saved = FEAS[`${p.gush}-${p.chelka}`];
   if (need.length && !saved) return { state: 'missing', need };
   const min = num0(dev.minProfit) / 100, scen = [];
-  const F = saved || feasAuto(p, dev);
+  const F0 = saved || feasAuto(p, dev), SWL = swLevels(p);
+  const swMult = SWL ? 1 + num0(dev.sunPrem) / 100 * SWL.sunScore + num0(dev.breezePrem) / 100 * SWL.breezeScore : 1;
+  const F = F0 ? { ...F0, swMult } : null;
   if (F) {
     if (!saved && !num0(dev.costRebuild)) need.push('costRebuild');
     else { const r = feasCompute(F, dev); scen.push({ id: 'rebuild', label: saved ? 'הריסה ובנייה · מחשבון מפורט' : 'הריסה ובנייה · הערכה אוטומטית', detailed: !!saved, F, ...r, saleable: r.rows.filter(x => !x.owner).reduce((a, x) => a + num0(x.net), 0) }); }
@@ -1268,6 +1276,16 @@ function econ(p, dev) {
   scen.sort((a, b) => b.profit - a.profit);
   const best = scen[0];
   return { state: 'ok', best, scen, ok: best.pct >= min, min, U: Math.max(1, p.units || 1), pend: p.calc.pend, need, detailed: !!best.detailed };
+}
+
+/* Sun & wind for the planned building: precomputed levels (ground = 0) for the floors the plan allows. */
+function swLevels(p) {
+  if (!SUNW || !SUNW.p) return null;
+  const L = SUNW.p[`${p.gush}-${p.chelka}`]; if (!L) return null;
+  const R = p.calc.reb, n = R && R.available ? (R.n || 6) + (R.roofs || 0) : Math.max(1, p.inputs.floors);
+  const rows = L.slice(0, Math.min(L.length, n)).map((v, k) => ({ k, share: v[0], best: v[1] / 10, heat: v[2] / 10, breeze: v[3] / 10 }));
+  const avg = f => rows.reduce((a, r) => a + f(r), 0) / (rows.length || 1);
+  return { rows, n, sunScore: avg(r => r.share) / 100, breezeScore: avg(r => r.breeze) / 10, planned: !!(R && R.available) };
 }
 
 /* Shared per-building docs (feasibility sheets, input overrides): db collection in the Claude view, localStorage on the public site. */
@@ -1301,6 +1319,136 @@ function useSharedMap(collection, lsKey, onChange) {
   return [st, write];
 }
 let OVR = {};
+let SUNW = null; // precomputed sun & wind levels per parcel (sunwind.json)
+/* Sun & wind core. Pure functions, used by the page (3D view, card) and by tools/sunwind_precompute.js (city-wide summary).
+   Coordinates: Israeli TM grid (meters, x east, y north), relative to the tile origin. Heights: absolute meters above sea level.
+   Sun: NOAA solar position algorithm. Shadows: 2D ray march against neighbour prisms (footprint + roof height).
+   Wind: Tel Aviv's prevailing summer sea breeze blows from the west-northwest; exposure = open fetch toward the wind at each height. */
+const SW = (() => {
+  const LAT = 32.08, LON = 34.78, RAD = Math.PI / 180;
+  // Israel clock: UTC+2, summer time (UTC+3) from the Friday before the last Sunday of March to the last Sunday of October.
+  function lastSunday(y, m) { const d = new Date(Date.UTC(y, m + 1, 0)); return d.getUTCDate() - d.getUTCDay(); }
+  function israelOffset(y, m, d) {
+    const start = new Date(Date.UTC(y, 2, lastSunday(y, 2) - 2)), end = new Date(Date.UTC(y, 9, lastSunday(y, 9)));
+    const t = new Date(Date.UTC(y, m, d)); return t >= start && t < end ? 3 : 2;
+  }
+  // Solar elevation/azimuth (degrees; azimuth clockwise from north) for a UTC Date.
+  function sunPos(date) {
+    const jd = date.getTime() / 86400000 + 2440587.5, T = (jd - 2451545) / 36525;
+    const L0 = (280.46646 + T * (36000.76983 + T * 0.0003032)) % 360;
+    const M = 357.52911 + T * (35999.05029 - 0.0001537 * T);
+    const e = 0.016708634 - T * (0.000042037 + 0.0000001267 * T);
+    const C = Math.sin(M * RAD) * (1.914602 - T * (0.004817 + 0.000014 * T)) + Math.sin(2 * M * RAD) * (0.019993 - 0.000101 * T) + Math.sin(3 * M * RAD) * 0.000289;
+    const lam = L0 + C - 0.00569 - 0.00478 * Math.sin((125.04 - 1934.136 * T) * RAD);
+    const eps0 = 23 + (26 + (21.448 - T * (46.815 + T * (0.00059 - T * 0.001813))) / 60) / 60;
+    const eps = eps0 + 0.00256 * Math.cos((125.04 - 1934.136 * T) * RAD);
+    const decl = Math.asin(Math.sin(eps * RAD) * Math.sin(lam * RAD));
+    const y = Math.tan(eps * RAD / 2) ** 2;
+    const eqt = 4 / RAD * (y * Math.sin(2 * L0 * RAD) - 2 * e * Math.sin(M * RAD) + 4 * e * y * Math.sin(M * RAD) * Math.cos(2 * L0 * RAD) - 0.5 * y * y * Math.sin(4 * L0 * RAD) - 1.25 * e * e * Math.sin(2 * M * RAD));
+    const mins = date.getUTCHours() * 60 + date.getUTCMinutes() + date.getUTCSeconds() / 60;
+    let ha = (mins + eqt + 4 * LON) / 4 - 180;
+    const lat = LAT * RAD, h = ha * RAD;
+    const cosZ = Math.sin(lat) * Math.sin(decl) + Math.cos(lat) * Math.cos(decl) * Math.cos(h);
+    const zen = Math.acos(Math.max(-1, Math.min(1, cosZ)));
+    let az = Math.atan2(Math.sin(h), Math.cos(h) * Math.sin(lat) - Math.tan(decl) * Math.cos(lat)) / RAD + 180;
+    return { el: 90 - zen / RAD, az: (az + 360) % 360 };
+  }
+  // Sun samples for one day (local clock), every `step` minutes while the sun is up.
+  function daySamples(y, m, d, step = 15) {
+    const off = israelOffset(y, m, d), out = [];
+    for (let t = 4 * 60; t <= 21 * 60; t += step) {
+      const date = new Date(Date.UTC(y, m, d, 0, t - off * 60));
+      const p = sunPos(date); if (p.el > 0.5) out.push({ t, ...p });
+    }
+    return out;
+  }
+  const DAYS = { winter: [2026, 11, 21], spring: [2026, 2, 21], summer: [2026, 5, 21] };
+  const cache = {};
+  const samples = (k, step = 15) => cache[k + step] || (cache[k + step] = daySamples(...DAYS[k], step));
+
+  // Facades of a footprint ring [[x,y],...]: outward normal azimuth (deg, clockwise from north), length, sample points.
+  function facades(ring) {
+    let a = 0; for (let i = 0; i < ring.length; i++) { const [x1, y1] = ring[i], [x2, y2] = ring[(i + 1) % ring.length]; a += x1 * y2 - x2 * y1; }
+    const ccw = a > 0, out = [];
+    for (let i = 0; i < ring.length; i++) {
+      const [x1, y1] = ring[i], [x2, y2] = ring[(i + 1) % ring.length];
+      const dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy); if (L < 2) continue;
+      let nx = ccw ? dy / L : -dy / L, ny = ccw ? -dx / L : dx / L; // outward normal
+      const az = (Math.atan2(nx, ny) / RAD + 360) % 360;
+      const pts = [0.25, 0.75].map(f => [x1 + dx * f + nx * 0.4, y1 + dy * f + ny * 0.4]);
+      out.push({ i, az, len: L, nx, ny, pts, a: [x1, y1], b: [x2, y2] });
+    }
+    return out;
+  }
+  // Ray (origin p, unit dir d) vs segment: distance or Infinity.
+  function raySeg(px, py, dx, dy, ax, ay, bx, by) {
+    const ex = bx - ax, ey = by - ay, den = dx * ey - dy * ex; if (Math.abs(den) < 1e-9) return Infinity;
+    const t = ((ax - px) * ey - (ay - py) * ex) / den, u = ((ax - px) * dy - (ay - py) * dx) / den;
+    return t > 0.05 && u >= 0 && u <= 1 ? t : Infinity;
+  }
+  // Is point (px,py,z) shaded toward sun (az, el) by any building? blds: [{ring, top}]
+  function blocked(px, py, z, az, el, blds, maxD = 400) {
+    const dx = Math.sin(az * RAD), dy = Math.cos(az * RAD), tanE = Math.tan(el * RAD);
+    for (const b of blds) {
+      if (b.top <= z) continue;
+      const need = (b.top - z) / tanE; // beyond this distance the building is too low to block
+      if (b.cx !== undefined && Math.hypot(b.cx - px, b.cy - py) - b.r > Math.min(need, maxD)) continue;
+      const r = b.ring;
+      for (let i = 0; i < r.length; i++) {
+        const t = raySeg(px, py, dx, dy, r[i][0], r[i][1], r[(i + 1) % r.length][0], r[(i + 1) % r.length][1]);
+        if (t < need && t < maxD) return true;
+      }
+    }
+    return false;
+  }
+  function prep(blds) { blds.forEach(b => { if (b.cx === undefined) { let sx = 0, sy = 0; b.ring.forEach(p => { sx += p[0]; sy += p[1]; }); b.cx = sx / b.ring.length; b.cy = sy / b.ring.length; b.r = Math.max(...b.ring.map(p => Math.hypot(p[0] - b.cx, p[1] - b.cy))); } }); return blds; }
+  // Direct-sun hours on one facade at height z (absolute), for a day key. Returns {hours, lit:[bool per sample]}
+  function facadeSun(f, z, blds, day, step = 15) {
+    const S = samples(day, step); let lit = 0; const mask = [];
+    for (const s of S) {
+      const sx = Math.sin(s.az * RAD), sy = Math.cos(s.az * RAD), cosI = f.nx * sx + f.ny * sy;
+      let on = 0;
+      if (cosI > 0.05) for (const p of f.pts) if (!blocked(p[0], p[1], z, s.az, s.el, blds)) on += 1 / f.pts.length;
+      mask.push(on); lit += on;
+    }
+    return { hours: lit * step / 60, mask, samples: S };
+  }
+  // Afternoon west sun in summer (heat): hours of direct sun after 13:00 on facades facing SW..NW.
+  function westHeat(f, z, blds, step = 15) {
+    if (!(f.az >= 202.5 && f.az <= 337.5)) return 0;
+    const r = facadeSun(f, z, blds, 'summer', step); let h = 0;
+    r.samples.forEach((s, i) => { if (s.t >= 13 * 60) h += r.mask[i] * step / 60; });
+    return h;
+  }
+  // Breeze exposure 0..10 at height z: open fetch toward the wind (W, WNW, NW) from facades that face it, plus distance to the sea.
+  const WIND = [{ az: 292.5, w: 0.5 }, { az: 270, w: 0.25 }, { az: 315, w: 0.25 }];
+  function openFetch(px, py, z, az, blds, cap = 200) {
+    const dx = Math.sin(az * RAD), dy = Math.cos(az * RAD); let best = cap;
+    for (const b of blds) {
+      if (b.top <= z) continue;
+      if (b.cx !== undefined && Math.hypot(b.cx - px, b.cy - py) - b.r > best) continue;
+      const r = b.ring;
+      for (let i = 0; i < r.length; i++) { const t = raySeg(px, py, dx, dy, r[i][0], r[i][1], r[(i + 1) % r.length][0], r[(i + 1) % r.length][1]); if (t < best) best = t; }
+    }
+    return best;
+  }
+  function breeze(facs, z, blds, seaDist) {
+    let open = 0;
+    for (const W of WIND) {
+      let bestF = 0;
+      for (const f of facs) {
+        const cosI = f.nx * Math.sin(W.az * RAD) + f.ny * Math.cos(W.az * RAD); if (cosI <= 0.2) continue;
+        const d = Math.max(...f.pts.map(p => openFetch(p[0], p[1], z, W.az, blds)));
+        bestF = Math.max(bestF, (d / 200) * Math.min(1, cosI * 1.2));
+      }
+      open += W.w * bestF;
+    }
+    const sea = seaDist == null ? 0.5 : 1 - Math.min(seaDist, 3000) / 3000;
+    return Math.round((0.75 * open + 0.25 * sea) * 100) / 10;
+  }
+  return { sunPos, daySamples, samples, israelOffset, facades, blocked, prep, facadeSun, westHeat, breeze, openFetch, DAYS, WIND };
+})();
+
 const FeasCtx = React.createContext({ write: async () => ({}) });
 
 function nadlanRef(p) {
@@ -1638,6 +1786,7 @@ function EconSection({ p, onOpenDev, onOpenFeas }) {
             <div className="px-2.5 py-1.5 border-b border-line-soft text-2xs font-bold text-ink-2">הכנסות לפי סוג דירה (דירות יזם)</div>
             {byType.map(([l, eq, v]) => <div key={l} className="flex justify-between gap-2 px-2.5 py-1"><span>{l} · <Num>{n0(eq)}</Num> מ״ר אקוו׳</span><Num className="font-semibold">{ils(v)}</Num></div>)}
           </div>}
+          {b.swMult > 1.0001 && <div className="text-2xs text-ink-2">כולל תוספת שמש ורוח של <Num>{pct(b.swMult - 1, 1)}</Num> להכנסות, לפי הפרמיות שקבעתם.</div>}
           {b.zero && b.zero.length > 0 && <div className="text-2xs rounded-md bg-act-soft text-act-ink px-2 py-1">עלויות שלא הוזנו נחשבות 0, והרווח גבוה מהאמיתי: {b.zero.map(k => (DEV_FIELDS.find(f => f.k === k) || {}).label).filter(Boolean).join(', ')}.</div>}
           {!ex.existingReal && <div className="text-2xs rounded-md bg-canvas border border-line text-ink-2 px-2 py-1">השטח הקיים ({n0(p.calc.existing)} מ״ר) הוא הערכה מהמפה, ויכול לטעות ב-±20%. מזינים את השטח האמיתי בשדה ״שטח בנוי קיים בפועל״ במנוע הזכויות.</div>}
           <div className="flex gap-3"><button onClick={onOpenFeas} className="text-[12px] font-bold text-accent hover:underline">{b.detailed ? 'פתיחת המחשבון המפורט' : 'מחשבון מפורט לפרויקט הזה'}</button><button onClick={onOpenDev} className="text-2xs font-semibold text-ink-3 hover:underline">עריכת הפרמטרים</button></div>
@@ -2866,6 +3015,263 @@ function Plain({ items, open: open0 = false, title = 'בשפה פשוטה' }) {
   );
 }
 
+const SW_COLORS = {
+  winter: [[0, '#1E3A8A'], [1.5, '#3B82F6'], [3, '#A5B4FC'], [5, '#FDE68A'], [8, '#F59E0B']],
+  summer: [[0, '#1E3A8A'], [3, '#3B82F6'], [6, '#A5B4FC'], [9, '#FDE68A'], [12, '#F59E0B']],
+  heat: [[0, '#F1F5F9'], [1, '#FED7AA'], [3, '#FB923C'], [5, '#DC2626']],
+  wind: [[0, '#E2E8F0'], [3, '#BAE6FD'], [6, '#38BDF8'], [10, '#0369A1']]
+};
+function swColor(mode, v) {
+  const S = SW_COLORS[mode]; if (v <= S[0][0]) return S[0][1]; if (v >= S[S.length - 1][0]) return S[S.length - 1][1];
+  for (let i = 1; i < S.length; i++) if (v <= S[i][0]) { const [a, ca] = S[i - 1], [b2, cb] = S[i]; const t = (v - a) / (b2 - a); const h = c => [1, 3, 5].map(j => parseInt(c.slice(j, j + 2), 16)); const A = h(ca), B = h(cb); return '#' + A.map((x, j) => Math.round(x + (B[j] - x) * t).toString(16).padStart(2, '0')).join(''); }
+  return S[0][1];
+}
+const floorName = k => k === 0 ? 'קרקע' : `קומה ${k}`;
+
+function SunWindSection({ p, onOpen3D }) {
+  const L = swLevels(p);
+  return (
+    <Section info="sunwind" eyebrow="שמש ורוח" title="כמה שמש ובריזה יקבלו הדירות" icon="spark">
+      <Plain items={[
+        ['מה רואים כאן', `לכל קומה בבניין ${L && L.planned ? 'שהתכנית מתירה' : 'הקיים'}: כמה שעות שמש ישירה מקבלת החזית הטובה ב-21 בדצמבר (היום הקצר בשנה), איזה חלק מהחזיתות מקבל 3 שעות ויותר, כמה שמש מערבית חמה יש בקיץ אחר הצהריים, ומדד בריזה מ-0 עד 10.`],
+        ['מאיפה זה מגיע', 'מיקום השמש מחושב אסטרונומית לכל רבע שעה. הצל מחושב מהגובה האמיתי של כל בניין בסביבה (מדידת לייזר של העירייה). את הבניין הקיים בחלקה הכלי מוריד, כי הוא ייהרס.'],
+        ['הבריזה', 'בתל אביב רוח הים נושבת בעיקר ממערב-צפון מערב, בקיץ אחר הצהריים. המדד בודק כמה פתוח הבניין לכיוון הזה בכל גובה, וכמה הוא קרוב לים. זה קירוב: מדידת רוח אמיתית לבניין דורשת סימולציה של יועץ רוח.'],
+        ['איך משתמשים', 'קומות נמוכות מוצלות יותר. ההבדל בין הקומות עוזר לתמחר: דירה בקומה מוצלת שווה פחות. כדי לראות את זה במו עיניכם, לוחצים על ״שמש ורוח בתלת-ממד״.']
+      ]} />
+      {L ? <div className="border border-line rounded-lg overflow-hidden">
+        <table className="w-full text-[12px]">
+          <thead className="bg-canvas text-2xs text-ink-3"><tr className="[&>th]:px-2 [&>th]:py-1 [&>th]:text-start"><th>קומה</th><th>שמש בחורף, חזית טובה</th><th>חזיתות עם 3 ש׳+</th><th>שמש מערבית בקיץ</th><th>בריזה</th></tr></thead>
+          <tbody>{[...L.rows].reverse().map(r => (
+            <tr key={r.k} className="border-t border-line-soft [&>td]:px-2 [&>td]:py-1">
+              <td className="text-ink-2">{floorName(r.k)}{L.planned && r.k >= (p.calc.reb.n || 99) ? ' (נסיגה)' : ''}</td>
+              <td><span className="inline-block w-2.5 h-2.5 rounded-sm me-1 align-middle" style={{ background: swColor('winter', r.best) }} /><Num className="font-semibold">{r.best.toFixed(1)}</Num> ש׳</td>
+              <td><Num>{r.share}</Num>%</td>
+              <td><span className="inline-block w-2.5 h-2.5 rounded-sm me-1 align-middle" style={{ background: swColor('heat', r.heat) }} /><Num>{r.heat.toFixed(1)}</Num> ש׳</td>
+              <td><span className="inline-block w-2.5 h-2.5 rounded-sm me-1 align-middle" style={{ background: swColor('wind', r.breeze) }} /><Num>{r.breeze.toFixed(1)}</Num></td>
+            </tr>))}</tbody>
+        </table>
+      </div> : <div className="text-2xs text-ink-3">אין עדיין חישוב שמש ורוח לחלקה הזו.</div>}
+      <Btn variant="primary" className="h-9 px-3 mt-2.5 w-full justify-center" onClick={onOpen3D}><Icon name="spark" className="w-4 h-4" />שמש ורוח בתלת-ממד</Btn>
+    </Section>
+  );
+}
+
+/* ---------------- 3D view ---------------- */
+let THREE_P = null;
+function loadThree() {
+  if (!THREE_P) THREE_P = (async () => {
+    if (!window.THREE) await loadScript('https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js');
+    if (!window.THREE.OrbitControls) await loadScript('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js');
+    return window.THREE;
+  })().catch(e => { THREE_P = null; throw e; });
+  return THREE_P;
+}
+const SW_TILES = {};
+let SW_META = null;
+async function swTile(k) {
+  if (SW_TILES[k] !== undefined) return SW_TILES[k];
+  if (SW_META && !SW_META.tiles.includes(k)) return (SW_TILES[k] = null);
+  try { SW_TILES[k] = await (await fetch(`sw/t_${k}.json`)).json(); } catch (e) { SW_TILES[k] = null; }
+  return SW_TILES[k];
+}
+async function swContext(p) {
+  const meta = SW_META || (SW_META = await (await fetch('sw/meta.json')).json());
+  const pid = `${p.gush}-${p.chelka}`;
+  let P = null, tk = null;
+  const poly = p.poly ? (Array.isArray(p.poly) ? p.poly : JSON.parse(p.poly)) : null;
+  if (poly) { const cx0 = poly.reduce((a, q) => a + q[0], 0) / poly.length, cy0 = poly.reduce((a, q) => a + q[1], 0) / poly.length; const k0 = `${Math.floor(cx0 / meta.tile)}_${Math.floor(cy0 / meta.tile)}`; const T = await swTile(k0); if (T && T.p[pid]) { P = T.p[pid]; tk = k0; } }
+  if (!P) for (const k of meta.tiles) { const T = await swTile(k); if (T && T.p[pid]) { P = T.p[pid]; tk = k; break; } }
+  if (!P) throw new Error('no parcel');
+  const [ti, tj] = tk.split('_').map(Number), near = [];
+  for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++) { const T = await swTile(`${ti + di}_${tj + dj}`); if (T) near.push(...T.b); }
+  let sx = 0, sy = 0; P.env.forEach(q => { sx += q[0]; sy += q[1]; }); sx /= P.env.length; sy /= P.env.length;
+  const all = SW.prep(near.map(b => ({ id: b[0], base: b[1], top: b[2], ring: b[3] })));
+  const own = new Set(P.own);
+  return { P, cx: sx, cy: sy, around: all.filter(b => Math.hypot(b.cx - sx, b.cy - sy) - b.r < 260), own };
+}
+
+function SunWind3D({ p, onClose }) {
+  const host = useRef(null), api = useRef({});
+  const [st, setSt] = useState({ phase: 'loading', err: null });
+  const [day, setDay] = useState('winter');
+  const [mins, setMins] = useState(12 * 60);
+  const [mode, setMode] = useState('winter');
+  const [play, setPlay] = useState(false);
+  const [showOld, setShowOld] = useState(false);
+  const [grid, setGrid] = useState(null);
+  const R = p.calc.reb, planned = !!(R && R.available), nFl = planned ? (R.n || 6) : Math.max(1, p.inputs.floors), nRoof = planned ? (R.roofs || 0) : 0;
+  const FH = 3.3;
+  const DAYS = { winter: ['21 בדצמבר', 2026, 11, 21], spring: ['21 במרץ', 2026, 2, 21], summer: ['21 ביוני', 2026, 5, 21] };
+
+  // build scene once
+  useEffect(() => {
+    let dead = false, raf = 0, renderer = null;
+    (async () => {
+      try {
+        const [THREE, ctx] = await Promise.all([loadThree(), swContext(p)]);
+        if (dead) return;
+        const { P, cx, cy, around, own } = ctx;
+        const el = host.current, W = el.clientWidth, H = el.clientHeight;
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); renderer.setSize(W, H);
+        renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.outputEncoding = THREE.sRGBEncoding;
+        el.appendChild(renderer.domElement);
+        const scene = new THREE.Scene(); scene.background = new THREE.Color('#dbeafe'); scene.fog = new THREE.Fog('#dbeafe', 380, 700);
+        const cam = new THREE.PerspectiveCamera(42, W / H, 1, 3000); cam.position.set(-120, 110, 150);
+        const ctl = new THREE.OrbitControls(cam, renderer.domElement); ctl.target.set(0, 12, 0); ctl.maxPolarAngle = Math.PI * 0.49; ctl.minDistance = 25; ctl.maxDistance = 600; ctl.enableDamping = true;
+        const X = x => x - cx, Z = y => -(y - cy), Y = h => h - P.g;
+        scene.add(new THREE.HemisphereLight('#ffffff', '#8b9bb4', 0.38));
+        const sun = new THREE.DirectionalLight('#fff4dc', 1.55); sun.castShadow = true;
+        sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -230, right: 230, top: 230, bottom: -230, near: 10, far: 1200 }); sun.shadow.bias = -0.0006;
+        scene.add(sun); scene.add(sun.target);
+        const ground = new THREE.Mesh(new THREE.CircleGeometry(520, 64), new THREE.MeshStandardMaterial({ color: '#f1f5f9', roughness: 1 }));
+        ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+        // lot outline
+        const lotPts = P.lot.map(q => new THREE.Vector3(X(q[0]), 0.08, Z(q[1]))); lotPts.push(lotPts[0].clone());
+        scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(lotPts), new THREE.LineBasicMaterial({ color: '#2563eb' })));
+        const prism = (ring, base, top, mat) => {
+          const sh = new THREE.Shape(ring.map(q => new THREE.Vector2(X(q[0]), -Z(q[1]))));
+          const g = new THREE.ExtrudeGeometry(sh, { depth: Math.max(0.5, top - base), bevelEnabled: false });
+          g.rotateX(-Math.PI / 2); g.translate(0, Y(base), 0);
+          const m = new THREE.Mesh(g, mat); m.castShadow = true; m.receiveShadow = true; return m;
+        };
+        const nbMat = new THREE.MeshStandardMaterial({ color: '#d4dbe5', roughness: 0.9 });
+        const oldMat = new THREE.MeshStandardMaterial({ color: '#94a3b8', roughness: 0.9, transparent: true, opacity: 0.35 });
+        const oldGroup = new THREE.Group(); scene.add(oldGroup);
+        around.forEach(b => { if (Math.hypot(b.cx - cx, b.cy - cy) > 240) return; const m = prism(b.ring, b.base, b.top, own.has(b.id) ? oldMat : nbMat); (own.has(b.id) ? oldGroup : scene).add(m); });
+        // planned building: one coloured wall quad per facade per floor + slabs
+        const bGroup = new THREE.Group(); scene.add(bGroup);
+        const facsTyp = SW.facades(P.env), facsRoof = P.roof && P.roof.length >= 3 ? SW.facades(P.roof) : facsTyp;
+        const walls = [];
+        const slabMat = new THREE.MeshStandardMaterial({ color: '#f8fafc', roughness: 0.6 });
+        const floors = [];
+        for (let k = 0; k < nFl + nRoof; k++) floors.push({ k, ring: k >= nFl ? (P.roof && P.roof.length >= 3 ? P.roof : P.env) : P.env, facs: k >= nFl ? facsRoof : facsTyp });
+        floors.forEach(F => {
+          const y0 = k => P.g + FH * k;
+          const slab = prism(F.ring, y0(F.k) + FH - 0.25, y0(F.k) + FH, slabMat); bGroup.add(slab);
+          F.facs.forEach(f => {
+            const g = new THREE.BufferGeometry();
+            const ax = X(f.a[0]), az = Z(f.a[1]), bx = X(f.b[0]), bz = Z(f.b[1]), ya = Y(y0(F.k)) + 0.02, yb = Y(y0(F.k) + FH - 0.25);
+            g.setAttribute('position', new THREE.Float32BufferAttribute([ax, ya, az, bx, ya, bz, bx, yb, bz, ax, ya, az, bx, yb, bz, ax, yb, az], 3));
+            g.computeVertexNormals();
+            const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.7, side: THREE.DoubleSide }));
+            m.castShadow = true; m.receiveShadow = true; bGroup.add(m);
+            walls.push({ mesh: m, f, k: F.k, z: y0(F.k) + 1.5 });
+          });
+        });
+        // north arrow
+        const arrow = new THREE.ArrowHelper(new THREE.Vector3(0, 0, -1), new THREE.Vector3(0, 0.3, -120), 40, '#0f172a', 12, 7); scene.add(arrow);
+        // sun path + sun ball
+        const pathLine = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineDashedMaterial({ color: '#f59e0b', dashSize: 6, gapSize: 4 })); scene.add(pathLine);
+        const sunBall = new THREE.Mesh(new THREE.SphereGeometry(7, 24, 16), new THREE.MeshBasicMaterial({ color: '#fbbf24' })); scene.add(sunBall);
+        // breeze particles
+        const NP = 900, ppos = new Float32Array(NP * 3), pts = new THREE.Points(new THREE.BufferGeometry(), new THREE.PointsMaterial({ color: '#0284c7', size: 1.6, transparent: true, opacity: 0.75 }));
+        pts.geometry.setAttribute('position', new THREE.BufferAttribute(ppos, 3)); pts.visible = false; scene.add(pts);
+        const wAz = 292.5 * Math.PI / 180, wdx = -Math.sin(wAz), wdz = Math.cos(wAz); // wind travels from WNW toward ESE
+        const seed = i => { const s = Math.sin(i * 12.9898) * 43758.5453; return s - Math.floor(s); };
+        for (let i = 0; i < NP; i++) { ppos[i * 3] = (seed(i) - 0.5) * 480; ppos[i * 3 + 1] = 2 + seed(i + 7) * 45; ppos[i * 3 + 2] = (seed(i + 3) - 0.5) * 480; }
+        api.current = { THREE, scene, cam, ctl, renderer, sun, sunBall, pathLine, walls, oldGroup, pts, ppos, wdx, wdz, around, own, P, NP };
+        const blds = around.filter(b => !own.has(b.id));
+        api.current.blds = blds;
+        const loop = () => {
+          raf = requestAnimationFrame(loop);
+          if (pts.visible) { for (let i = 0; i < NP; i++) { ppos[i * 3] += wdx * 1.6; ppos[i * 3 + 2] += wdz * 1.6; if (Math.abs(ppos[i * 3]) > 250 || Math.abs(ppos[i * 3 + 2]) > 250) { ppos[i * 3] = -wdx * 240 + (seed(i + performance.now()) - 0.5) * 300 * wdz; ppos[i * 3 + 2] = -wdz * 240 + (seed(i * 3 + performance.now()) - 0.5) * 300 * -wdx; } } pts.geometry.attributes.position.needsUpdate = true; }
+          ctl.update(); renderer.render(scene, cam);
+        };
+        loop();
+        const onResize = () => { const w = el.clientWidth, h = el.clientHeight; renderer.setSize(w, h); cam.aspect = w / h; cam.updateProjectionMatrix(); };
+        window.addEventListener('resize', onResize); api.current.onResize = onResize;
+        setSt({ phase: 'ready', err: null });
+      } catch (e) { if (!dead) setSt({ phase: 'error', err: String(e && e.message || e) }); }
+    })();
+    return () => { dead = true; cancelAnimationFrame(raf); if (api.current.onResize) window.removeEventListener('resize', api.current.onResize); if (renderer) { renderer.dispose(); renderer.domElement.remove(); } };
+  }, [p.id]);
+
+  // sun position for date/time
+  useEffect(() => {
+    const A = api.current; if (st.phase !== 'ready' || !A.THREE) return;
+    const [, y, m, d] = DAYS[day], off = SW.israelOffset(y, m, d);
+    const pos = SW.sunPos(new Date(Date.UTC(y, m, d, 0, mins - off * 60)));
+    const vec = el => { const r = 320, e = el.el * Math.PI / 180, a = el.az * Math.PI / 180; return new A.THREE.Vector3(Math.sin(a) * Math.cos(e) * r, Math.sin(e) * r, -Math.cos(a) * Math.cos(e) * r); };
+    const v = vec(pos);
+    A.sun.position.copy(v); A.sun.intensity = pos.el > 0 ? 1.55 : 0; A.sunBall.position.copy(v.clone().multiplyScalar(0.62)); A.sunBall.visible = pos.el > 0;
+    const path = SW.daySamples(y, m, d, 10).map(s => vec(s).multiplyScalar(0.62));
+    A.pathLine.geometry.dispose(); A.pathLine.geometry = new A.THREE.BufferGeometry().setFromPoints(path); A.pathLine.computeLineDistances();
+    if (mode === 'live') A.walls.forEach(w => {
+      const sx = Math.sin(pos.az * Math.PI / 180), sy = Math.cos(pos.az * Math.PI / 180), facing = w.f.nx * sx + w.f.ny * sy > 0.05 && pos.el > 0;
+      const lit = facing && w.f.pts.some(q => !SW.blocked(q[0], q[1], w.z, pos.az, pos.el, A.blds));
+      w.mesh.material.color.set(lit ? '#FCD34D' : '#64748B');
+    });
+  }, [st.phase, day, mins, mode]);
+
+  // facade colouring for analytic modes + per-floor grid
+  useEffect(() => {
+    const A = api.current; if (st.phase !== 'ready' || mode === 'live') return;
+    const t0 = setTimeout(() => {
+      const cells = A.walls.map(w => {
+        let v;
+        if (mode === 'winter' || mode === 'summer') v = SW.facadeSun(w.f, w.z, A.blds, mode, 15).hours;
+        else if (mode === 'heat') v = SW.westHeat(w.f, w.z, A.blds, 15);
+        else v = SW.breeze([w.f], w.z, A.blds, A.P.sea);
+        w.mesh.material.color.set(swColor(mode, v)); return { k: w.k, az: w.f.az, len: w.f.len, v };
+      });
+      const byK = {};
+      cells.forEach(c => { const dir = ['צפון', 'מזרח', 'דרום', 'מערב'][Math.round(((c.az + 360) % 360) / 90) % 4]; byK[c.k] = byK[c.k] || {}; const o = byK[c.k][dir] || { v: 0, len: 0 }; o.v += c.v * c.len; o.len += c.len; byK[c.k][dir] = o; });
+      setGrid(Object.entries(byK).map(([k, o]) => ({ k: +k, d: Object.fromEntries(Object.entries(o).map(([dd, x]) => [dd, x.v / x.len])) })).sort((a, b) => b.k - a.k));
+    }, 30);
+    A.pts.visible = mode === 'wind';
+    return () => clearTimeout(t0);
+  }, [st.phase, mode]);
+  useEffect(() => { const A = api.current; if (A.oldGroup) A.oldGroup.visible = showOld; }, [showOld, st.phase]);
+  useEffect(() => { if (!play) return; const id = setInterval(() => setMins(m => m >= 20 * 60 ? 5 * 60 : m + 5), 90); return () => clearInterval(id); }, [play]);
+
+  const hhmm = m => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+  const MODES = [['winter', 'שמש בחורף'], ['summer', 'שמש בקיץ'], ['heat', 'חום מערבי בקיץ'], ['wind', 'בריזה'], ['live', 'אור וצל ברגע הזה']];
+  const unit = mode === 'wind' ? '' : ' ש׳';
+  const LEG = { winter: 'שעות שמש ישירה ב-21 בדצמבר', summer: 'שעות שמש ישירה ב-21 ביוני', heat: 'שעות שמש מערבית אחרי 13:00 ב-21 ביוני', wind: 'מדד בריזה 0–10 (ממערב-צפון מערב)', live: 'צהוב = שמש עכשיו, אפור = צל' }[mode];
+  return (
+    <div className="fixed inset-0 z-[90] bg-ink/60 grid place-items-center p-2 sm:p-4" role="dialog" aria-modal="true" aria-label="שמש ורוח בתלת-ממד">
+      <div className="bg-white rounded-2xl shadow-pop w-full max-w-[1280px] h-[calc(100vh-16px)] sm:h-[calc(100vh-32px)] flex flex-col overflow-hidden">
+        <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-line">
+          <div className="min-w-0"><div className="text-[15px] font-bold text-ink truncate">שמש ורוח · {p.address}</div><div className="text-2xs text-ink-3">{planned ? `הבניין שהתכנית מתירה: ${nFl} קומות${nRoof ? ` + ${nRoof} קומות גג` : ''}` : 'הבניין הקיים'}, מול הבניינים האמיתיים בסביבה</div></div>
+          <button onClick={onClose} className="p-1.5 rounded-md text-ink-3 hover:bg-canvas" aria-label="סגירה"><Icon name="x" className="w-5 h-5" /></button>
+        </div>
+        <div className="flex-1 min-h-0 grid lg:grid-cols-[1fr_340px]">
+          <div className="relative min-h-[320px]">
+            <div ref={host} className="absolute inset-0" />
+            {st.phase !== 'ready' && <div className="absolute inset-0 grid place-items-center text-[13px] text-ink-2 bg-white/70">{st.phase === 'error' ? `לא הצלחתי לטעון את התלת-ממד (${st.err}).` : 'בונה את הבניין והשכונה בתלת-ממד…'}</div>}
+            <div className="absolute top-2 start-2 flex flex-wrap gap-1">{MODES.map(([k, l]) => <button key={k} onClick={() => setMode(k)} className={`h-8 px-2.5 rounded-lg text-[12px] font-semibold shadow-card ${mode === k ? 'bg-ink text-white' : 'bg-white/95 text-ink-2'}`}>{l}</button>)}</div>
+            <div className="absolute bottom-2 inset-x-2 rounded-xl bg-white/95 shadow-card p-2 grid gap-1.5">
+              <div className="flex flex-wrap items-center gap-2">
+                {Object.entries(DAYS).map(([k, [l]]) => <button key={k} onClick={() => setDay(k)} className={`h-7 px-2 rounded-md text-[12px] font-semibold ${day === k ? 'bg-accent text-white' : 'bg-canvas text-ink-2'}`}>{l}</button>)}
+                <button onClick={() => setPlay(x => !x)} className="h-7 px-2.5 rounded-md text-[12px] font-bold bg-ink text-white">{play ? 'עצירה' : 'הפעלת יום'}</button>
+                <Num className="text-[14px] font-bold text-ink">{hhmm(mins)}</Num>
+                <label className="ms-auto inline-flex items-center gap-1 text-2xs text-ink-2"><input type="checkbox" checked={showOld} onChange={e => setShowOld(e.target.checked)} />הבניין הקיים (שקוף)</label>
+              </div>
+              <input type="range" min={300} max={1200} step={5} value={mins} onChange={e => { setPlay(false); setMins(+e.target.value); }} aria-label="שעה ביום" className="w-full accent-accent" />
+              <div className="flex items-center gap-2 text-2xs text-ink-2"><span>{LEG}</span>{mode !== 'live' && <span className="h-2.5 flex-1 rounded-full" style={{ background: `linear-gradient(to left, ${SW_COLORS[mode].map(c => c[1]).join(',')})` }} />}{mode !== 'live' && <span className="num">{SW_COLORS[mode][0][0]}–{SW_COLORS[mode][SW_COLORS[mode].length - 1][0]}{unit}</span>}</div>
+            </div>
+          </div>
+          <div className="border-s border-line overflow-y-auto scroll-thin p-3 grid content-start gap-3">
+            <Plain open items={[
+              ['מה רואים', 'הבניין שהתכנית מתירה בחלקה, בצבעים, בתוך הבניינים האמיתיים שמסביב (אפור). הקו הכחול הוא גבול המגרש, החץ השחור מצביע צפונה, והקו הכתום הוא מסלול השמש ביום שבחרתם.'],
+              ['איך משתמשים', 'גוררים כדי לסובב, גלגלת כדי להתקרב. בוחרים יום ושעה, או ״הפעלת יום״ כדי לראות את הצל זז. כל צבע על הקיר הוא קומה אחת בחזית אחת.'],
+              ['מה המספרים אומרים', 'שמש בחורף היא היתרון הכי מבוקש: 3 שעות ויותר ב-21 בדצמבר זה טוב. שמש מערבית בקיץ אחר הצהריים מחממת, ומוסיפה מזגן. בריזה גבוהה = פתוח לרוח הים.'],
+              ['גבולות', 'הבניין החדש משורטט לפי קווי הבניין, לא לפי תכנון אדריכלי. הבריזה היא מדד חשיפה, לא מדידת רוח. עצים לא נכללים.']
+            ]} />
+            {grid && mode !== 'live' && <div className="border border-line rounded-lg overflow-hidden">
+              <div className="px-2 py-1.5 bg-canvas text-2xs font-bold text-ink-2">{LEG}, לפי קומה וכיוון חזית</div>
+              <table className="w-full text-[12px]"><thead className="text-2xs text-ink-3"><tr className="[&>th]:px-1.5 [&>th]:py-1 [&>th]:text-start"><th>קומה</th>{['צפון', 'מזרח', 'דרום', 'מערב'].map(x => <th key={x}>{x}</th>)}</tr></thead>
+                <tbody>{grid.map(r => <tr key={r.k} className="border-t border-line-soft [&>td]:px-1.5 [&>td]:py-0.5"><td className="text-ink-2">{floorName(r.k)}</td>{['צפון', 'מזרח', 'דרום', 'מערב'].map(x => <td key={x}>{r.d[x] != null ? <span className="inline-flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ background: swColor(mode, r.d[x]) }} /><Num>{r.d[x].toFixed(1)}</Num></span> : <span className="text-ink-4">—</span>}</td>)}</tr>)}</tbody></table>
+            </div>}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function TabuSection({ p, legalSigned }) {
   const { remove } = React.useContext(NesachCtx);
   const NS = p.nesach;
@@ -2940,7 +3346,7 @@ function TabuSection({ p, legalSigned }) {
   );
 }
 
-function Inspector({ onOpenFeas, onOpenDev, p, onClose, onExport, onSave, saved, onContact, overlay, onOverride, onReset, openRule }) {
+function Inspector({ onOpen3D, onOpenFeas, onOpenDev, p, onClose, onExport, onSave, saved, onContact, overlay, onOverride, onReset, openRule }) {
   const st = STATUS[p.status];
   const legalSigned = p.unitList.filter(u => u.notes.includes('warn126')).length;
   return (
@@ -2996,6 +3402,8 @@ function Inspector({ onOpenFeas, onOpenDev, p, onClose, onExport, onSave, saved,
         <EconSection p={p} onOpenDev={onOpenDev} onOpenFeas={onOpenFeas} />
 
         <CtxSection p={p} />
+
+        <SunWindSection p={p} onOpen3D={onOpen3D} />
 
         <TabuSection p={p} legalSigned={legalSigned} />
 
@@ -3258,7 +3666,7 @@ function App() {
 
   const inspector = selected && (
     <Inspector onOpenDev={() => setDevOpen(true)} p={selected} overlay={!isXL} saved={isSaved} onClose={() => setSelectedId(null)}
-      onOpenFeas={() => setModal('feas')} onOverride={onOverride} onReset={onResetOverrides} openRule={id => setRulesFocus(id)}
+      onOpen3D={() => setModal('sw3d')} onOpenFeas={() => setModal('feas')} onOverride={onOverride} onReset={onResetOverrides} openRule={id => setRulesFocus(id)}
       onExport={() => setModal('teaser')} onSave={onSave} onContact={() => setModal('contact')} />
   );
 
@@ -3300,6 +3708,7 @@ function App() {
       {aboutOpen && <AboutModal onClose={closeAbout} onOpenDev={() => setDevOpen(true)} />}
       {devOpen && <DevParamsModal dev={dev} onSave={saveDev} onClose={() => setDevOpen(false)} toast={toast} />}
       {rulesFocus !== null && <RulesModal focusId={rulesFocus} onClose={() => setRulesFocus(null)} />}
+      {modal === 'sw3d' && selected && <SunWind3D p={selected} onClose={() => setModal(null)} />}
       {modal === 'feas' && selected && <FeasModal p={selected} dev={dev.values} onClose={() => setModal(null)} toast={toast} />}
       {modal === 'order' && <OrderListModal rows={rows} onClose={() => setModal(null)} toast={toast} />}
       {modal === 'teaser' && selected && <TeaserModal p={selected} onClose={() => setModal(null)} toast={toast} />}
