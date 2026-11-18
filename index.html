@@ -328,7 +328,7 @@ function computeRights(x) {
     let n, roofs = 1;
     if (x.rova === '3') { n = x.main ? (decl ? 6 : 7) : decl ? (x.lotArea >= 500 ? 6 : 5) : 6; reb.rules.push(decl ? 'r3-new-decl' : 'r3-new-out'); if (decl && !x.main) reb.rules.push('r3-lot'); }
     else if (low) { n = 3; reb.rules.push('r4-low', 'r4b'); lowHi = 4 * typNew + roofNew; }
-    else if (x.rova === '4') { if (x.main) n = 8; else if (decl) n = 6; else { n = 6; roofs = 2; } reb.rules.push('r4-new'); }
+    else if (x.rova === '4') { if (x.main) n = 8; else if (x.arl) n = 7; else if (decl) n = 6; else { n = 6; roofs = 2; } reb.rules.push('r4-new'); } // Arlozorov: 7 + one partial roof floor (TA/3729A §2.2א(1))
     else if (x.rova === 'ig') { n = decl ? 7 : 9; roofs = 0; }
     else { n = x.main ? 5 : (x.lotArea >= 500 ? 6 : 5); reb.rules.push('r56-declared'); }
     reb.parts.push({ label: `${n} קומות × ${typNew} מ״ר (בתוך קווי הבניין)`, sqm: n * typNew });
@@ -550,6 +550,7 @@ function baseInputsReal(streetId, num) {
     basement: 0, basementUnit: false, roofBuilt: false, existingReal: 0,
     permitYear: R.yr || mb.permitYear, year: R.yr || mb.year,
     geo: R.bn && R.bn[1] ? { bn: R.bn, br: R.br, fs: R.fs } : null,
+    arl: R.area === '4' && (streetId === 'ארלוזורוב' || (R.alt || []).some(a => a.startsWith('ארלוזורוב '))),
     declared: !!R.decl || !!R.u4, low: R.area === '4' && R.low ? R.low : null,
     cottage: R.area === '4' && !!R.low && !(R.own && R.own.u > 1) && (R.ft || 999) < 160 && (R.fl || 0) + 1 <= 3,
     preservation: R.pres === 2 ? 'strict' : R.pres === 1 ? 'regular' : 'none',
@@ -1183,7 +1184,8 @@ const DEV_GROUPS = [
     { k: 'elec', label: 'חיבורי חשמל ובזק', unit: '₪', ph: '150,000' },
     { k: 'purchaseTax', label: 'מס רכישה', unit: '₪', ph: '1,300,000' },
     { k: 'financing', label: 'מימון, ערבויות חוק מכר וביטוח', unit: '₪', ph: '2,500,000' },
-    { k: 'overhead', label: 'תקורה', unit: '% מסך העלויות', ph: '1' }] },
+    { k: 'overhead', label: 'תקורה', unit: '% מסך העלויות', ph: '1' },
+    { k: 'indirectPct', label: 'תוספת כוללת לעלויות שאינן בנייה, כשלא פירטתם אותן', unit: '% מעלות הביצוע', ph: '55', h: 'כל מה שאינו חוזה הביצוע: ניהול, תכנון, אגרות, משפטי, שכירות לבעלים, מס רכישה, שיווק, מימון. נכנס לחישוב רק אם לא הזנתם את השורות האלה אחת אחת. בבדיקה של 4 פרויקטים אמיתיים בתל אביב זה יצא 48%–60% מחוזה הביצוע.' }] },
   { title: 'שמש ורוח במחיר (לא חובה)', note: 'כמה אתם מעריכים שקונים מוסיפים על דירה שטופת שמש בחורף, או פתוחה לבריזה. אין נתוני שוק לכיול, ולכן זו ההערכה שלכם. ריק = בלי השפעה.', fields: [
     { k: 'sunPrem', label: 'פרמיה מרבית לבניין שטוף שמש בחורף', unit: '% מהמחיר', ph: '3', h: 'ניתנת במלואה לבניין שבו כל החזיתות בכל הקומות מקבלות 3 שעות שמש ויותר ב-21 בדצמבר, ובחלקה לפי החלק שמקבל.' },
     { k: 'breezePrem', label: 'פרמיה מרבית לחשיפה מלאה לבריזה', unit: '% מהמחיר', ph: '2', h: 'ניתנת במלואה במדד בריזה 10, ובחלקה לפי המדד.' }] },
@@ -1195,7 +1197,7 @@ const DEV_FIELDS = [...PRICE_FIELDS, ...DEV_GROUPS.flatMap(g => g.fields)];
 const VAT = 1.18;
 const num0 = v => (v === '' || v == null || !isFinite(+v)) ? 0 : +v;
 const priceOf = (dev, t, z) => { const k = zkey(z); return num0(dev[`p_${t}_${k}`]) || (t === 'typ' ? num0(dev['sale_' + k]) : 0); };
-const COST_KEYS = ['costRebuild', 'costBasement', 'costBalc', 'demolition', 'contingency', 'mgmt', 'architect', 'consult', 'fees', 'betterment', 'lawTen', 'lawDev', 'marketing', 'elec', 'purchaseTax', 'financing', 'overhead', 'rent', 'months', 'moving'];
+const COST_KEYS = ['indirectPct', 'costRebuild', 'costBasement', 'costBalc', 'demolition', 'contingency', 'mgmt', 'architect', 'consult', 'fees', 'betterment', 'lawTen', 'lawDev', 'marketing', 'elec', 'purchaseTax', 'financing', 'overhead', 'rent', 'months', 'moving'];
 
 /* Automatic unit mix for a new building (demolish & rebuild), from the rights engine. Every number is an estimate the detailed calculator can change. */
 function feasAuto(p, dev) {
@@ -1245,11 +1247,14 @@ function feasCompute(F, dev) {
   const owners = num0(F.U) * (num0(C.rent) * num0(C.months) + num0(C.moving));
   const fixed = ['mgmt', 'architect', 'consult', 'fees', 'betterment', 'lawTen', 'elec', 'purchaseTax', 'financing'].reduce((a, k) => a + num0(C[k]), 0);
   const pctItems = revEx * (num0(C.marketing) + num0(C.lawDev)) / 100;
-  const sub = construction + contingency + owners + fixed + pctItems;
+  // indicative allowance for everything that isn't construction, used only when none of those lines were entered
+  const detailed = owners > 0 || fixed > 0 || num0(C.marketing) > 0;
+  const indirect = !detailed && num0(C.indirectPct) ? construction * num0(C.indirectPct) / 100 : 0;
+  const sub = construction + contingency + owners + fixed + pctItems + indirect;
   const overhead = sub * num0(C.overhead) / 100;
   const cost = sub + overhead, profit = revEx - cost;
-  const zero = COST_KEYS.filter(k => !num0(C[k]) && !['contingency', 'overhead', 'lawDev', 'marketing'].includes(k));
-  return { swMult, rows, revenue, revEx, balcM2, construction, contingency, owners, fixed, pctItems, overhead, cost, profit,
+  const zero = indirect ? [] : COST_KEYS.filter(k => !num0(C[k]) && !['contingency', 'overhead', 'lawDev', 'marketing', 'indirectPct'].includes(k));
+  return { indirect, indirectPct: indirect ? num0(C.indirectPct) : 0, swMult, rows, revenue, revEx, balcM2, construction, contingency, owners, fixed, pctItems, overhead, cost, profit,
     pct: cost > 0 ? profit / cost : 0, pctSales: revEx > 0 ? profit / revEx : 0, roe: num0(dev.equity) ? profit / num0(dev.equity) : null, zero };
 }
 
@@ -1321,6 +1326,7 @@ function whyChips(p) {
   if (p.calc.pend) risk.push('תכנית טרם פורסמה');
   if (p.nesach && p.nesach.s.liens.length) risk.push('עיקולים בנסח');
   if (p.units > 30) risk.push(`${p.units} בעלים`);
+  if (!(p.condoRegistered && p.ownReal) && p.inputs.lotArea >= 1200) risk.push('מגרש גדול בלי בית משותף רשום');
   return { good: out.sort((a, b) => b.w - a.w).map(x => x.t), risk };
 }
 
@@ -1783,7 +1789,7 @@ function FeasModal({ p, dev, onClose, toast }) {
           {R.roe != null && <div className="sm:col-span-4 text-2xs text-white/70">תשואה על ההון העצמי: <Num>{pct(R.roe, 0)}</Num></div>}
         </div>
         <div className="grid sm:grid-cols-2 gap-1 text-2xs text-ink-2">
-          {[['ביצוע: בנייה, מרתף, מרפסות, הריסה', R.construction], ['בלתי צפוי', R.contingency], ['שכירות והובלות לבעלים', R.owners], ['עלויות רכות, מיסים ומימון', R.fixed], ['שיווק ועו״ד יזם (% מהמכירות)', R.pctItems], ['תקורה', R.overhead]].map(([l, v]) => <div key={l} className="flex justify-between gap-2 bg-canvas rounded px-2 py-1"><span>{l}</span><Num>{ils(v)}</Num></div>)}
+          {[['ביצוע: בנייה, מרתף, מרפסות, הריסה', R.construction], ...(R.indirect ? [[`תוספת אינדיקטיבית ${R.indirectPct}% לעלויות שאינן בנייה`, R.indirect]] : []), ['בלתי צפוי', R.contingency], ['שכירות והובלות לבעלים', R.owners], ['עלויות רכות, מיסים ומימון', R.fixed], ['שיווק ועו״ד יזם (% מהמכירות)', R.pctItems], ['תקורה', R.overhead]].map(([l, v]) => <div key={l} className="flex justify-between gap-2 bg-canvas rounded px-2 py-1"><span>{l}</span><Num>{ils(v)}</Num></div>)}
         </div>
         {R.zero.length > 0 && <div className="text-2xs rounded-md bg-act-soft text-act-ink px-2 py-1">שורות עלות שלא הוזנו ונחשבות 0: {R.zero.map(k => (COSTL.find(f => f.k === k) || {}).label).filter(Boolean).join(', ')}. הרווח גבוה מהאמיתי עד שימולאו.</div>}
       </div>
@@ -3477,7 +3483,7 @@ function FinderView({ dev, onOpen, compare, toggleCompare, onCompare, onMemo }) 
   const [zone, setZone] = useState('4');
   const [sortBy, setSortBy] = useState('profit');
   const base = devWithBase(dev.values);
-  const softMissing = !['mgmt', 'architect', 'fees', 'rent'].some(k => dev.values && num0(dev.values[k]));
+  const [openId, setOpenId] = useState(null);
   const list = useMemo(() => {
     const recs = AREA_BY_ZONE[zone] || [], seen = new Set(), out = [];
     recs.forEach((r, i) => { const id = r.st_ + '-' + r.n; if (seen.has(id)) return; seen.add(id); const P = genParcelC(r.st_, r.n, i, recs.length, OVR[`${r.g}-${r.c}`]); P.econ = econ(P, base.values); out.push(P); });
@@ -3498,7 +3504,7 @@ function FinderView({ dev, onOpen, compare, toggleCompare, onCompare, onMemo }) 
         </div>
         <div className="flex flex-wrap items-center gap-3 text-[12px] text-white/80">
           <span>{n0(list.length)} בניינים פנויים ברובע · מוצגים 10 המובילים</span>
-          <label className="inline-flex items-center gap-1">מיון<select value={sortBy} onChange={e => setSortBy(e.target.value)} className="h-7 rounded bg-white/10 text-white text-[12px] px-1"><option value="profit" className="text-ink">{softMissing ? 'עודף לפני עלויות רכות' : 'רווח צפוי'}</option><option value="rights" className="text-ink">תוספת זכויות</option><option value="score" className="text-ink">ציון סינון</option></select></label>
+          <label className="inline-flex items-center gap-1">מיון<select value={sortBy} onChange={e => setSortBy(e.target.value)} className="h-7 rounded bg-white/10 text-white text-[12px] px-1"><option value="profit" className="text-ink">רווח צפוי</option><option value="rights" className="text-ink">תוספת זכויות</option><option value="score" className="text-ink">ציון סינון</option></select></label>
           {base.base && <span className="inline-flex items-center gap-1 rounded bg-amber-400/20 text-amber-100 px-1.5 py-0.5">רווח לפי ״בסיס שוק״ ציבורי <Info text={`ערכים שלא הזנתם נלקחו מבסיס שוק ציבורי: ${BASELINE && BASELINE.source ? BASELINE.source : ''}. הזינו פרמטרים משלכם כדי לקבל את הרווח שלכם.`} /></span>}
         </div>
         {BT && <div className="rounded-lg bg-white/10 px-3 py-2 text-[12.5px] leading-snug"><b>הוכחה מהעבר:</b> {BT.headline} <Info text={BT.detail} /></div>}
@@ -3513,13 +3519,49 @@ function FinderView({ dev, onOpen, compare, toggleCompare, onCompare, onMemo }) 
               <div className="flex flex-wrap gap-1 mt-1.5">{W.good.slice(0, 5).map(t => <span key={t} className="text-[11.5px] font-semibold px-1.5 py-0.5 rounded-md bg-go-soft text-go-ink">{t}</span>)}{W.risk.slice(0, 2).map(t => <span key={t} className="text-[11.5px] font-semibold px-1.5 py-0.5 rounded-md bg-act-soft text-act-ink">{t}</span>)}</div>
             </div>
             <div className="text-end grid gap-1 justify-items-end">
-              {e && e.state === 'ok' ? (softMissing ? <><Num className="text-[18px] font-extrabold text-ink">{ils2(e.best.profit)}</Num><div className="text-2xs font-semibold text-act-ink">עודף לפני עלויות רכות, שכירות ומימון</div><div className="text-2xs text-ink-3">הכנסות <Num>{ils(e.best.revEx)}</Num> · ביצוע <Num>{ils(e.best.construction)}</Num></div></> : <><Num className={`text-[18px] font-extrabold ${e.ok ? 'text-go-ink' : 'text-ink'}`}>{ils2(e.best.profit)}</Num><div className="text-2xs text-ink-3">רווח צפוי · <Num>{pct(e.best.pct, 0)}</Num> מהעלות</div></>) : <div className="text-2xs text-ink-3">אין חישוב רווח</div>}
+              {e && e.state === 'ok' ? <button onClick={() => setOpenId(openId === P.id ? null : P.id)} className="text-end group" aria-expanded={openId === P.id}>
+                <Num className={`text-[18px] font-extrabold ${e.ok ? 'text-go-ink' : 'text-ink'} group-hover:underline decoration-dotted`}>{ils2(e.best.profit)}</Num>
+                <div className="text-2xs text-ink-3">{e.best.indirect ? 'רווח משוער (אינדיקטיבי)' : 'רווח צפוי'} · <Num>{pct(e.best.pct, 0)}</Num> מהעלות</div>
+                <div className="text-2xs font-semibold text-accent">{openId === P.id ? 'סגירת הפירוט ▲' : 'איך חושב? ▼'}</div>
+              </button> : <div className="text-2xs text-ink-3">אין חישוב רווח</div>}
               <div className="flex gap-1.5 mt-1"><Btn variant={on ? 'soft' : 'ghost'} className="h-8 px-2.5" onClick={() => toggleCompare(P)} aria-pressed={on}>{on ? 'בהשוואה ✓' : 'להשוואה'}</Btn><Btn variant="ghost" className="h-8 px-2.5" onClick={() => onMemo(P)}>סיכום עסקה</Btn><Btn variant="primary" className="h-8 px-2.5" onClick={() => onOpen(P)}>ניתוח מלא</Btn></div>
             </div>
+            {openId === P.id && e && e.state === 'ok' && <div className="sm:col-span-3"><ProfitBreakdown p={P} e={e} /></div>}
           </li>); })}
         {!top.length && <li className="text-[13px] text-ink-3 p-4">אין ברובע הזה בניינים פנויים עם תוספת זכויות.</li>}
       </ol>
       {compare.length > 0 && <div className="sticky bottom-2 z-20 rounded-xl bg-ink text-white shadow-pop px-3 py-2 flex flex-wrap items-center gap-2"><span className="text-[13px] font-semibold">{compare.length} בניינים להשוואה</span><Btn variant="primary" className="h-8 px-3" onClick={onCompare} disabled={compare.length < 2}>השוואה זה מול זה</Btn><span className="text-2xs text-white/60">עד 3 בניינים</span></div>}
+    </div>
+  );
+}
+
+function ProfitBreakdown({ p, e }) {
+  const b = e.best, x = p.inputs, R = p.calc.reb, F = b.F || {};
+  const sig = (realRec(p.streetId, p.num) || {}).sig || [];
+  const caveats = [
+    sig.length ? `תכנית ${sig[0].t} (${sig[0].n || ''}) בהכנה חלה על החלקה. אם תאושר, היא קובעת את הזכויות במקום תכנית הרובע.` : null,
+    p.calc.ex && !p.calc.ex.existingReal ? `השטח הקיים (${n0(p.calc.existing)} מ״ר) הוא הערכה מהמפה, ויכול לטעות ב-±20%. הוא קובע כמה מקבלים הבעלים.` : null,
+    !(p.condoRegistered && p.ownReal) && x.lotArea >= 1200 ? `מגרש של ${n0(x.lotArea)} מ״ר בלי בית משותף רשום, ומספר הדירות הוא הערכה. ייתכן שזה לא בניין מגורים רגיל (מבנה ציבור, מסחר, כמה מבנים). בדקו בנסח ובסיור לפני הכול.` : null,
+    'המחירים הם ממוצע לרובע. רחוב ראשי ורועש, או קומה נמוכה, יוזילו.',
+    b.indirect ? `העלויות שאינן בנייה הן תוספת אינדיקטיבית של ${b.indirectPct}% מהביצוע. החליפו בעלויות שלכם בפרמטרים היזמיים או במחשבון המפורט.` : null,
+    p.calc.pend ? 'תכנית 4320 אושרה וטרם פורסמה: הזכויות הן תרחיש.' : null
+  ].filter(Boolean);
+  const Row = ({ l, v, strong, neg }) => <div className={`flex justify-between gap-3 py-1 ${strong ? 'font-bold text-ink' : 'text-ink-2'}`}><span>{l}</span><Num className={neg ? 'text-stop' : ''}>{v}</Num></div>;
+  return (
+    <div className="rounded-lg bg-canvas border border-line p-3 grid gap-3 text-[12.5px]">
+      <div><div className="text-2xs font-bold text-ink-3 mb-1">1. מה מותר לבנות</div>
+        <div className="text-ink-2">מגרש <Num>{n0(x.lotArea)}</Num> מ״ר · {R.short} · קומה <Num>{n0(p.calc.typNew)}</Num> מ״ר{p.calc.ex && p.calc.ex.capped55 ? ` (מוגבל ל-${x.rova === '4' ? 50 : 55}% מהמגרש)` : ''} → <b><Num>{n0(F.gross || R.total)}</Num> מ״ר ברוטו</b></div></div>
+      <div><div className="text-2xs font-bold text-ink-3 mb-1">2. מה היזם מוכר (הבעלים מקבלים <Num>{n0(F.ownersNet || 0)}</Num> מ״ר: הקיים ועוד תוספת)</div>
+        <table className="w-full text-[12px]"><thead className="text-2xs text-ink-3"><tr className="[&>th]:text-start [&>th]:py-0.5"><th>סוג</th><th>מ״ר אקוויוולנטי</th><th>₪ למ״ר</th><th>שווי</th></tr></thead>
+          <tbody>{b.rows.filter(r => !r.owner).map((r, i) => <tr key={i} className="border-t border-line-soft [&>td]:py-0.5"><td>{UT_LABEL[r.type]} · {r.floor}</td><td><Num>{n0(r.eq)}</Num></td><td><Num>{n0(r.price)}</Num></td><td><Num>{ils(r.value)}</Num></td></tr>)}</tbody></table></div>
+      <div className="border-t border-line pt-1">
+        <Row l="הכנסות כולל מע״מ" v={ils(b.revenue)} />
+        <Row l="הכנסות בלי מע״מ (÷1.18)" v={ils(b.revEx)} strong />
+        <Row l={`בנייה: ${n0(F.gross || 0)} מ״ר × ${n0(num0(F.costs && F.costs.costRebuild))} ₪`} v={'−' + ils(b.construction)} />
+        {b.indirect ? <Row l={`תוספת ${b.indirectPct}% לעלויות שאינן בנייה (אינדיקטיבי)`} v={'−' + ils(b.indirect)} /> : <Row l="עלויות רכות, בעלים, מיסים ומימון" v={'−' + ils(b.cost - b.construction)} />}
+        <Row l={`רווח (${pct(b.pct, 0)} מהעלות, ${pct(b.pctSales, 0)} מהמכירות)`} v={ils2(b.profit)} strong neg={b.profit < 0} />
+      </div>
+      <div><div className="text-2xs font-bold text-ink-3 mb-1">מה צריך לבדוק לפני שמאמינים למספר</div><ul className="list-disc ps-4 grid gap-0.5 text-ink-2">{caveats.map(c => <li key={c}>{c}</li>)}</ul></div>
     </div>
   );
 }
@@ -3535,7 +3577,7 @@ function memoData(p) {
     ['תוספת', p.verifiedAdd != null ? `+${n0(p.verifiedAdd)} מ״ר` : '—'],
     ['דירות / בעלים', `${p.units}${p.ownReal ? '' : ' (הערכה)'}`],
     ['שלב', STAGE[p.stage].label],
-    b && !b.fixed && !b.owners ? ['עודף לפני עלויות רכות', `${ils2(b.profit)} (הכנסות ${ils(b.revEx)}, ביצוע ${ils(b.construction)}; בלי עלויות רכות, שכירות ומימון)`] : ['רווח צפוי', b ? `${ils2(b.profit)} (${pct(b.pct, 0)} מהעלות, ${pct(b.pctSales, 0)} מהמכירות)` : '—'],
+    b && b.indirect ? ['רווח משוער (אינדיקטיבי)', `${ils2(b.profit)} (${pct(b.pct, 0)} מהעלות). הכנסות ${ils(b.revEx)} בלי מע״מ, בנייה ${ils(b.construction)}, ועוד ${b.indirectPct}% לעלויות שאינן בנייה`] : ['רווח צפוי', b ? `${ils2(b.profit)} (${pct(b.pct, 0)} מהעלות, ${pct(b.pctSales, 0)} מהמכירות)` : '—'],
     ['שמש בחורף', L ? `${Math.round(L.sunScore * 100)}% מהחזיתות מקבלות 3 ש׳ ומעלה` : '—'],
     ['בריזה (קומה עליונה)', L && L.rows.length ? `${L.rows[L.rows.length - 1].breeze.toFixed(1)} / 10` : '—'],
     ['תחבורה עתידית', fut ? `${TRANSIT[fut.line].label} · ${fmtM(fut.d)}` : '—'],
