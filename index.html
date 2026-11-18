@@ -155,7 +155,7 @@ const RULES = [
   { id: 'rova-basement', layer: 2, short: 'רובעים 3–4 §4.1.2(ז)(3)', title: 'שטח עיקרי במרתף בהריסה ובנייה', value: '(א) דירה עצמאית בהיתר במרתף, שאינה מחוברת לקומת הקרקע, משוחזרת במרתף החדש עד שטחה הקיים, בנוסף לזכויות שמעל הקרקע. תוקן ב-16.9.2024 כך שיחול גם על שימוש שאינו עיקרי. (ב) לחלופין, מחוץ לאזור ההכרזה, ניוד השטח אל מעל הקרקע בהשלמת קומות או בקומה חלקית נוספת, בלי הקלה ובלי פרסום. ניוד כזה מותר רק אם הבקשה להיתר הוגשה עד 29.11.2015, והמרתף העליון ישמש לחניה בלבד.', when: 'הריסה ובנייה', strength: 'vested', conf: 'high', src: ['p3616', 'p3729'] },
   // Rova 4
   { id: 'r4-plan', layer: 2, short: 'תא/3729א', title: 'תכנית רובע 4 בתוקף', value: 'בין בני דן לשאול המלך, ובין אבן גבירול לנמיר ואיילון. לא כולל החלקות לאורך אבן גבירול, את המע״ר הצפוני, את מתחם 2000 ואת שכונת צמרת. לא חלה על מבנים לשימור.', when: 'רובע 4', strength: 'vested', conf: 'high', src: ['p3729'] },
-  { id: 'r4-new', layer: 2, short: 'תא/3729א §2.2א', title: 'רובע 4, בנייה חדשה', value: 'רחובות ראשיים (נמיר, פנקס, ז׳בוטינסקי, ויצמן): 8 קומות + גג חלקי. ארלוזורוב: 7. רחובות לא ראשיים מחוץ להכרזה: 6 + שתי קומות גג חלקיות. בתכניות לבנייה נמוכה (117, 122, 196, 398, 478): 3–4 + גג. באזור ההכרזה (דוד המלך, דובנוב, שאול המלך): 6 + גג, וחריגה היא סטייה ניכרת.', when: 'הריסה ובנייה', strength: 'vested', conf: 'high', src: ['p3729'] },
+  { id: 'r4-new', layer: 2, short: 'תא/3729א §2.2א', title: 'רובע 4, בנייה חדשה', value: 'במגרש של 750 מ״ר ומעלה התכסית עד 50% משטח המגרש. רחובות ראשיים (נמיר, פנקס, ז׳בוטינסקי, ויצמן): 8 קומות + גג חלקי. ארלוזורוב: 7. רחובות לא ראשיים מחוץ להכרזה: 6 + שתי קומות גג חלקיות. בתכניות לבנייה נמוכה (117, 122, 196, 398, 478): 3–4 + גג. באזור ההכרזה (דוד המלך, דובנוב, שאול המלך): 6 + גג, וחריגה היא סטייה ניכרת.', when: 'הריסה ובנייה', strength: 'vested', conf: 'high', src: ['p3729'] },
   { id: 'r4-add', layer: 2, short: 'תא/3729א §2.2ב', title: 'רובע 4, תוספת', value: 'היתר לפני 1.1.1980. רחוב ראשי: השלמה עד 8 קומות + גג. רחוב לא ראשי, בניין עד 6 קומות: +1 + גג. 7 קומות ומעלה: +2 + גג מחוץ להכרזה, גג חלקי בלבד בהכרזה. בתכניות לבנייה נמוכה, בניין של 2 קומות: +165% משטח הגג. אחרי 1980: חדרי יציאה לגג בלבד.', when: 'תוספת', strength: 'vested', conf: 'high', src: ['p3729'] },
   { id: 'r4-low', layer: 2, short: 'תא/3729א §2.2א(3), §2.2ב(1)ה', title: 'רובע 4, תכניות לבנייה נמוכה (שיכונים)', value: 'בתחום תכניות 117, 122, 196, 398 ו-478. בנייה חדשה במגרש לבניין משותף: עד 3 או 4 קומות + גג חלקי (כולל קרקע), לפי מיקום המגרש בתשריט. המנוע מאמת 3 ומציג 4 בטווח. מגרש קוטג׳: רק חדר יציאה לגג או עליית גג. תוספת (היתר לפני 1980): רק בבניין משותף בן 2 קומות (צמוד קרקע או על עמודים), עד 165% משטח הגג הקיים, בקומה אחת + גג חלקי.', when: 'רובע 4, בנייה נמוכה', strength: 'vested', conf: 'high', src: ['p3729'] },
   { id: 'r4b', layer: 2, short: 'תא/3729ב', title: 'תיקון הוראות לבנייה נמוכה ברובע 4', value: 'בתוקף מ-18.5.2026. בבנייה חדשה: תוספת 6% משטח המגרש בקוטג׳ים בתחום 196 (שיכון הקצינים) ובתחום 398 באזורי מגורים א2 ו-ב2. בבניינים בקיר משותף: מימוש רק בבנייה משותפת בעת ובעונה אחת, למעט בתחום 117, 122 ו-478, שם מותר מימוש נפרד עד 3 קומות + גג חלקי. מסדירה גם את חלקות 544 ו-574 (תכנית 398, אזור ב2).', when: 'רובע 4, בנייה נמוכה', strength: 'vested', conf: 'high', src: ['p3729b'] },
@@ -241,9 +241,11 @@ function computeRights(x) {
   // The front line is an assumption (4 m): both rova plans defer it to the older plans of each street, which are not published as data.
   const g = x.geo && x.geo.bn && x.geo.bn[1] ? x.geo : null;
   const plate = i => g ? g.bn[i] : Math.max(0, x.frontage - 2 * side) * Math.max(0, depthLot - [3, 4, 5][i] - rear);
-  const cap55 = v => Math.round((r56 || x.rova === '3') && big ? Math.min(v, 0.55 * x.lotArea) : v);
+  // coverage caps on lots ≥ 750 m²: 55% in Rova 3 and 4320, 50% in Rova 4 (TA/3729A §2.2א: 'במגרשים בשטח 750 מ״ר ומעלה תכסית הבנייה לא תעלה על 50%')
+  const covCap = (r56 || x.rova === '3') ? 0.55 : x.rova === '4' ? 0.50 : null;
+  const cap55 = v => Math.round(covCap && big ? Math.min(v, covCap * x.lotArea) : v);
   const typNew = cap55(plate(1)), typNewHi = cap55(plate(0)), typNewLo = cap55(plate(2));
-  const capped55 = (r56 || x.rova === '3') && big && plate(1) > 0.55 * x.lotArea;
+  const capped55 = !!covCap && big && plate(1) > covCap * x.lotArea;
   const wEx = Math.max(6, Math.min(wNew || 6, x.typ / Math.max(8, dNew || 8)));
   const dEx = x.typ / wEx;
   const cap65 = decl || x.rova === '5-6' || x.rova === 'ig';
@@ -461,6 +463,8 @@ async function loadData() {
   try { NADLAN = await (await fetch('nadlan.json')).json(); } catch (e) { NADLAN = null; }
   try { CTX = await (await fetch('context.json')).json(); } catch (e) { CTX = null; }
   try { SUNW = await (await fetch('sunwind.json')).json(); } catch (e) { SUNW = null; }
+  try { BASELINE = await (await fetch('baseline.json')).json(); } catch (e) { BASELINE = null; }
+  try { BACKTEST = await (await fetch('backtest.json')).json(); } catch (e) { BACKTEST = null; }
   const zones = Object.entries(AREA_BY_ZONE).map(([z, arr]) => ({ type: 'area', id: z, he: `סריקת ${ZONE_META[z].label}`, sub: `${arr.length.toLocaleString('en-US')} חלקות · המובילות`, aliases: [ZONE_META[z].label, ZONE_META[z].hood, 'רובע ' + z, 'סריקה'] }));
   const streets = Object.entries(AREA_STREETS).map(([st, arr]) => ({ type: 'street', id: st, he: st, sub: `${ZONE_META[modeOf(arr.map(r => r.area))].label} · ${arr.length} חלקות`, aliases: [st, ...(STREET_EN[st] || [])], n: arr.length })).sort((x, y) => y.n - x.n);
   SEARCH_INDEX = [...zones, ...streets];
@@ -1288,6 +1292,37 @@ function swLevels(p) {
   return { rows, n, sunScore: avg(r => r.share) / 100, breezeScore: avg(r => r.breeze) / 10, planned: !!(R && R.available) };
 }
 
+/* Market baseline: the user's own parameters win; anything they left empty falls back to the public baseline (baseline.json). */
+function devWithBase(dev) {
+  if (!BASELINE || !BASELINE.values) return { values: dev || null, base: false, keys: [] };
+  const v = { ...BASELINE.values }, keys = [];
+  Object.entries(dev || {}).forEach(([k, x]) => { if (x !== '' && x != null && isFinite(+x)) v[k] = x; });
+  Object.keys(BASELINE.values).forEach(k => { if (!dev || dev[k] === '' || dev[k] == null) keys.push(k); });
+  return { values: v, base: keys.length > 0, keys };
+}
+/* One-line "why": strongest reasons first, then risks. */
+function whyChips(p) {
+  const out = [], risk = [];
+  if (p.verifiedAdd > 0) out.push({ t: `+${n0(p.verifiedAdd)} מ״ר לפי התכנית`, w: 5 });
+  if (p.stage === 'clean') out.push({ t: 'נקי בטאבו', w: 6 }); else if (p.status === 'clean') out.push({ t: 'אין סימן ליזם', w: 4 }); else if (p.status === 'protocol') out.push({ t: 'סימן מוקדם בוועדה', w: 4 });
+  if (p.units && p.units <= 12 && p.ownReal) out.push({ t: `רק ${p.units} בעלים להחתמה`, w: 3 });
+  if (p.inputs.lotArea >= 750) out.push({ t: `מגרש גדול (${n0(p.inputs.lotArea)} מ״ר)`, w: 2 });
+  if (p.ctx && p.ctx.adj && p.ctx.adj.length) { const a = p.ctx.adj[0]; out.push({ t: `${TRANSIT[a.line].label} ${fmtM(a.d)}`, w: 2 }); }
+  const L = swLevels(p);
+  if (L && L.sunScore >= 0.6) out.push({ t: `שמש בחורף ב-${Math.round(L.sunScore * 100)}% מהחזיתות`, w: 2 });
+  if (L && L.rows.length && L.rows[L.rows.length - 1].breeze >= 7) out.push({ t: 'בריזה בקומות העליונות', w: 1 });
+  if (p.discount != null && p.discount >= 0.08) out.push({ t: `מודעה ${pct(p.discount)} מתחת לשכונה`, w: 3 });
+  if (p.ctx && p.ctx.nz && p.ctx.nz <= 2) out.push({ t: 'רחוב שקט', w: 1 });
+  if (p.preservation) risk.push('מבנה לשימור');
+  if (p.inputs.low) risk.push('אזור בנייה נמוכה');
+  if (p.nonPrivate && p.nonPrivate.length) risk.push('בעלות לא פרטית');
+  if (p.stage === 'contested') risk.push('יזם התחיל להחתים');
+  if (p.calc.pend) risk.push('תכנית טרם פורסמה');
+  if (p.nesach && p.nesach.s.liens.length) risk.push('עיקולים בנסח');
+  if (p.units > 30) risk.push(`${p.units} בעלים`);
+  return { good: out.sort((a, b) => b.w - a.w).map(x => x.t), risk };
+}
+
 /* Shared per-building docs (feasibility sheets, input overrides): db collection in the Claude view, localStorage on the public site. */
 function useSharedMap(collection, lsKey, onChange) {
   const [st, setSt] = useState({ map: {}, src: 'loading', v: 0 });
@@ -1320,6 +1355,7 @@ function useSharedMap(collection, lsKey, onChange) {
 }
 let OVR = {};
 let SUNW = null; // precomputed sun & wind levels per parcel (sunwind.json)
+let BASELINE = null, BACKTEST = null; // market baseline parameters (public sources) and the backtest summary
 /* Sun & wind core. Pure functions, used by the page (3D view, card) and by tools/sunwind_precompute.js (city-wide summary).
    Coordinates: Israeli TM grid (meters, x east, y north), relative to the tile origin. Heights: absolute meters above sea level.
    Sun: NOAA solar position algorithm. Shadows: 2D ray march against neighbour prisms (footprint + roof height).
@@ -2621,7 +2657,7 @@ function RightsExplain({ p, openRule }) {
             {e.geo === 'real'
               ? <>צורת המגרש האמיתית מהמפה (<Num>{n0(x.lotArea)}</Num> מ״ר) <T t="gis" />, פחות רצועה לאורך הרחוב: קו בניין קדמי <Num>4</Num> מ׳ <T t="est" />, ולאורך השכנים: צדדי <Num>{e.side}</Num> מ׳ ואחורי <Num>{e.rear}</Num> מ׳ <T t="plan" />. מה שנשאר: <b><Num>{n0(c.typNew)}</Num> מ״ר לקומה</b> <T t="calc" />.</>
               : <>אין צורה מדויקת למגרש, ולכן הוא חושב כמלבן <T t="est" />: רוחב <Num>{x.frontage}</Num> − 2×<Num>{e.side}</Num> = <Num>{e.wNew}</Num> מ׳; עומק <Num>{n0(x.lotArea)}</Num>÷<Num>{x.frontage}</Num> = <Num>{e.depthLot}</Num> − <Num>4</Num> − <Num>{e.rear}</Num> = <Num>{e.dNew}</Num> מ׳; <Num>{e.wNew}</Num>×<Num>{e.dNew}</Num> = <b><Num>{n0(c.typNew)}</Num> מ״ר לקומה</b>.</>}
-            {e.capped55 && <> הוגבל ל-55% משטח המגרש (מגרש מעל 750 מ״ר) <T t="plan" />.</>}
+            {e.capped55 && <> הוגבל ל-{x.rova === '4' ? '50%' : '55%'} משטח המגרש (מגרש של 750 מ״ר ומעלה) <T t="plan" />.</>}
             <div className="text-2xs text-ink-3 mt-1">למה הקו הקדמי הוא הנחה: תכנית הרובע קובעת שהקו הקדמי ״בהתאם לתכניות התקפות״, כלומר לפי התכנית הישנה של כל רחוב, והוא לא מפורסם כנתון. קו של 3 מ׳ נותן <Num>{n0(e.typNewHi)}</Num> מ״ר לקומה, ו-5 מ׳ נותן <Num>{n0(e.typNewLo)}</Num>. כל מטר משנה כ-<Num>{n0(perM)}</Num> מ״ר בקומה, כ-<Num>{n0(perM * nFl)}</Num> מ״ר בבניין.{e.fs != null && <> הבניין הקיים עומד כ-<Num>{e.fs}</Num> מ׳ מהרחוב <T t="gis" />, אבל זה לא בהכרח הקו המותר.</>}</div>
           </Row>}
           <Row n={c.reb.available ? 4 : 3} title="החישוב לכל מסלול">
@@ -3058,11 +3094,17 @@ function SunWindSection({ p, onOpen3D }) {
 
 /* ---------------- 3D view ---------------- */
 let THREE_P = null;
+const THREE_EX = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/';
 function loadThree() {
   if (!THREE_P) THREE_P = (async () => {
     if (!window.THREE) await loadScript('https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js');
-    if (!window.THREE.OrbitControls) await loadScript('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js');
-    return window.THREE;
+    const T = window.THREE, need = [
+      ['OrbitControls', 'controls/OrbitControls.js'], ['Sky', 'objects/Sky.js'], ['CSS2DRenderer', 'renderers/CSS2DRenderer.js'],
+      ['CopyShader', 'shaders/CopyShader.js'], ['FXAAShader', 'shaders/FXAAShader.js'], ['SSAOShader', 'shaders/SSAOShader.js'], ['SimplexNoise', 'math/SimplexNoise.js'],
+      ['EffectComposer', 'postprocessing/EffectComposer.js'], ['MaskPass', 'postprocessing/MaskPass.js'], ['RenderPass', 'postprocessing/RenderPass.js'],
+      ['ShaderPass', 'postprocessing/ShaderPass.js'], ['SSAOPass', 'postprocessing/SSAOPass.js']];
+    for (const [k, f] of need) if (!T[k]) await loadScript(THREE_EX + f);
+    return T;
   })().catch(e => { THREE_P = null; throw e; });
   return THREE_P;
 }
@@ -3082,167 +3124,249 @@ async function swContext(p) {
   if (poly) { const cx0 = poly.reduce((a, q) => a + q[0], 0) / poly.length, cy0 = poly.reduce((a, q) => a + q[1], 0) / poly.length; const k0 = `${Math.floor(cx0 / meta.tile)}_${Math.floor(cy0 / meta.tile)}`; const T = await swTile(k0); if (T && T.p[pid]) { P = T.p[pid]; tk = k0; } }
   if (!P) for (const k of meta.tiles) { const T = await swTile(k); if (T && T.p[pid]) { P = T.p[pid]; tk = k; break; } }
   if (!P) throw new Error('no parcel');
-  const [ti, tj] = tk.split('_').map(Number), near = [];
-  for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++) { const T = await swTile(`${ti + di}_${tj + dj}`); if (T) near.push(...T.b); }
+  const [ti, tj] = tk.split('_').map(Number), near = [], roads = [];
+  for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++) { const T = await swTile(`${ti + di}_${tj + dj}`); if (T) { near.push(...T.b); roads.push(...(T.r || [])); } }
   let sx = 0, sy = 0; P.env.forEach(q => { sx += q[0]; sy += q[1]; }); sx /= P.env.length; sy /= P.env.length;
   const all = SW.prep(near.map(b => ({ id: b[0], base: b[1], top: b[2], ring: b[3] })));
   const own = new Set(P.own);
-  return { P, cx: sx, cy: sy, around: all.filter(b => Math.hypot(b.cx - sx, b.cy - sy) - b.r < 260), own };
+  return { P, cx: sx, cy: sy, around: all.filter(b => Math.hypot(b.cx - sx, b.cy - sy) - b.r < 260), own, roads };
 }
 
 function SunWind3D({ p, onClose }) {
   const host = useRef(null), api = useRef({});
   const [st, setSt] = useState({ phase: 'loading', err: null });
   const [day, setDay] = useState('winter');
-  const [mins, setMins] = useState(12 * 60);
-  const [mode, setMode] = useState('winter');
+  const [mins, setMins] = useState(10 * 60 + 30);
+  const [mode, setMode] = useState('model');
   const [play, setPlay] = useState(false);
   const [showOld, setShowOld] = useState(false);
+  const [hq, setHq] = useState(() => (window.innerWidth || 1200) >= 900);
   const [grid, setGrid] = useState(null);
   const R = p.calc.reb, planned = !!(R && R.available), nFl = planned ? (R.n || 6) : Math.max(1, p.inputs.floors), nRoof = planned ? (R.roofs || 0) : 0;
   const FH = 3.3;
   const DAYS = { winter: ['21 בדצמבר', 2026, 11, 21], spring: ['21 במרץ', 2026, 2, 21], summer: ['21 ביוני', 2026, 5, 21] };
 
-  // build scene once
+  // ---- build the scene once ----
   useEffect(() => {
-    let dead = false, raf = 0, renderer = null;
+    let dead = false, raf = 0, renderer = null, labelR = null;
     (async () => {
       try {
         const [THREE, ctx] = await Promise.all([loadThree(), swContext(p)]);
         if (dead) return;
-        const { P, cx, cy, around, own } = ctx;
+        const { P, cx, cy, around, own, roads } = ctx;
         const el = host.current, W = el.clientWidth, H = el.clientHeight;
-        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
         renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); renderer.setSize(W, H);
         renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-        renderer.outputEncoding = THREE.sRGBEncoding;
+        renderer.outputEncoding = THREE.sRGBEncoding; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.62;
         el.appendChild(renderer.domElement);
-        const scene = new THREE.Scene(); scene.background = new THREE.Color('#dbeafe'); scene.fog = new THREE.Fog('#dbeafe', 380, 700);
-        const cam = new THREE.PerspectiveCamera(42, W / H, 1, 3000); cam.position.set(-120, 110, 150);
-        const ctl = new THREE.OrbitControls(cam, renderer.domElement); ctl.target.set(0, 12, 0); ctl.maxPolarAngle = Math.PI * 0.49; ctl.minDistance = 25; ctl.maxDistance = 600; ctl.enableDamping = true;
+        labelR = new THREE.CSS2DRenderer(); labelR.setSize(W, H); Object.assign(labelR.domElement.style, { position: 'absolute', inset: '0', pointerEvents: 'none', direction: 'ltr' }); labelR.domElement.setAttribute('dir', 'ltr'); el.appendChild(labelR.domElement);
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.Fog('#e9eef4', 420, 1100);
+        const cam = new THREE.PerspectiveCamera(38, W / H, 1, 6000);
+        const ctl = new THREE.OrbitControls(cam, renderer.domElement); ctl.target.set(0, 14, 0); ctl.maxPolarAngle = Math.PI * 0.485; ctl.minDistance = 30; ctl.maxDistance = 700; ctl.enableDamping = true; ctl.dampingFactor = 0.08;
         const X = x => x - cx, Z = y => -(y - cy), Y = h => h - P.g;
-        scene.add(new THREE.HemisphereLight('#ffffff', '#8b9bb4', 0.38));
-        const sun = new THREE.DirectionalLight('#fff4dc', 1.55); sun.castShadow = true;
-        sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -230, right: 230, top: 230, bottom: -230, near: 10, far: 1200 }); sun.shadow.bias = -0.0006;
+        // sky (physically based) + environment for reflections
+        const sky = new THREE.Sky(); sky.scale.setScalar(5000); scene.add(sky);
+        Object.assign(sky.material.uniforms.turbidity, { value: 3.2 }); sky.material.uniforms.rayleigh.value = 1.1; sky.material.uniforms.mieCoefficient.value = 0.004; sky.material.uniforms.mieDirectionalG.value = 0.82;
+        const envScene = new THREE.Scene(), sky2 = new THREE.Sky(); sky2.scale.setScalar(5000); sky2.material.uniforms = sky.material.uniforms; envScene.add(sky2);
+        const pmrem = new THREE.PMREMGenerator(renderer);
+        const hemi = new THREE.HemisphereLight('#f2f6fb', '#c9c2b6', 0.55); scene.add(hemi);
+        const sun = new THREE.DirectionalLight('#fff3dd', 2.6); sun.castShadow = true;
+        const SM = hq ? 4096 : 2048; sun.shadow.mapSize.set(SM, SM);
+        Object.assign(sun.shadow.camera, { left: -260, right: 260, top: 260, bottom: -260, near: 10, far: 1600 }); sun.shadow.bias = -0.00035; sun.shadow.normalBias = 0.4; sun.shadow.radius = 3;
         scene.add(sun); scene.add(sun.target);
-        const ground = new THREE.Mesh(new THREE.CircleGeometry(520, 64), new THREE.MeshStandardMaterial({ color: '#f1f5f9', roughness: 1 }));
+        // ground, streets, lot
+        const ground = new THREE.Mesh(new THREE.PlaneGeometry(3000, 3000), new THREE.MeshStandardMaterial({ color: '#ece9e3', roughness: 1 }));
         ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
-        // lot outline
-        const lotPts = P.lot.map(q => new THREE.Vector3(X(q[0]), 0.08, Z(q[1]))); lotPts.push(lotPts[0].clone());
+        const roadMat = new THREE.MeshStandardMaterial({ color: '#d3d6db', roughness: 0.95 });
+        const roadPos = [];
+        roads.forEach(([w, nm, path]) => {
+          for (let i = 0; i < path.length - 1; i++) {
+            const ax = X(path[i][0]), az = Z(path[i][1]), bx = X(path[i + 1][0]), bz = Z(path[i + 1][1]);
+            if (Math.hypot(ax, az) > 520 && Math.hypot(bx, bz) > 520) continue;
+            const dx = bx - ax, dz = bz - az, L = Math.hypot(dx, dz); if (L < 0.5) continue;
+            const nx = -dz / L * w / 2, nz = dx / L * w / 2, y = 0.04;
+            roadPos.push(ax + nx, y, az + nz, bx + nx, y, bz + nz, bx - nx, y, bz - nz, ax + nx, y, az + nz, bx - nx, y, bz - nz, ax - nx, y, az - nz);
+          }
+        });
+        if (roadPos.length) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(roadPos, 3)); g.computeVertexNormals(); const m = new THREE.Mesh(g, roadMat); m.receiveShadow = true; scene.add(m); }
+        const lotShape = new THREE.Shape(P.lot.map(q => new THREE.Vector2(X(q[0]), -Z(q[1]))));
+        const lotMesh = new THREE.Mesh(new THREE.ShapeGeometry(lotShape), new THREE.MeshStandardMaterial({ color: '#bfdbfe', roughness: 1, transparent: true, opacity: 0.85 }));
+        lotMesh.rotation.x = -Math.PI / 2; lotMesh.position.y = 0.08; lotMesh.receiveShadow = true; scene.add(lotMesh);
+        const lotPts = P.lot.map(q => new THREE.Vector3(X(q[0]), 0.12, Z(q[1]))); lotPts.push(lotPts[0].clone());
         scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(lotPts), new THREE.LineBasicMaterial({ color: '#2563eb' })));
+        // white-model neighbours with crisp edges
         const prism = (ring, base, top, mat) => {
           const sh = new THREE.Shape(ring.map(q => new THREE.Vector2(X(q[0]), -Z(q[1]))));
-          const g = new THREE.ExtrudeGeometry(sh, { depth: Math.max(0.5, top - base), bevelEnabled: false });
+          const g = new THREE.ExtrudeGeometry(sh, { depth: Math.max(0.3, top - base), bevelEnabled: false });
           g.rotateX(-Math.PI / 2); g.translate(0, Y(base), 0);
           const m = new THREE.Mesh(g, mat); m.castShadow = true; m.receiveShadow = true; return m;
         };
-        const nbMat = new THREE.MeshStandardMaterial({ color: '#d4dbe5', roughness: 0.9 });
-        const oldMat = new THREE.MeshStandardMaterial({ color: '#94a3b8', roughness: 0.9, transparent: true, opacity: 0.35 });
+        const nbMat = new THREE.MeshStandardMaterial({ color: '#f7f6f3', roughness: 0.88 });
+        const edgeMat = new THREE.LineBasicMaterial({ color: '#7d8794', transparent: true, opacity: 0.32 });
+        const oldMat = new THREE.MeshStandardMaterial({ color: '#94a3b8', roughness: 0.9, transparent: true, opacity: 0.3, depthWrite: false });
         const oldGroup = new THREE.Group(); scene.add(oldGroup);
-        around.forEach(b => { if (Math.hypot(b.cx - cx, b.cy - cy) > 240) return; const m = prism(b.ring, b.base, b.top, own.has(b.id) ? oldMat : nbMat); (own.has(b.id) ? oldGroup : scene).add(m); });
-        // planned building: one coloured wall quad per facade per floor + slabs
+        around.forEach(b => {
+          if (Math.hypot(b.cx - cx, b.cy - cy) > 330) return;
+          const isOwn = own.has(b.id), m = prism(b.ring, b.base, b.top, isOwn ? oldMat : nbMat);
+          (isOwn ? oldGroup : scene).add(m);
+          if (!isOwn) { const e = new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry, 25), edgeMat); scene.add(e); }
+        });
+        // planned building: glass bands + white slabs + roof parapet
         const bGroup = new THREE.Group(); scene.add(bGroup);
         const facsTyp = SW.facades(P.env), facsRoof = P.roof && P.roof.length >= 3 ? SW.facades(P.roof) : facsTyp;
-        const walls = [];
-        const slabMat = new THREE.MeshStandardMaterial({ color: '#f8fafc', roughness: 0.6 });
-        const floors = [];
+        const glassBase = { color: '#4f6f8a', metalness: 0.55, roughness: 0.06, envMapIntensity: 1.1 };
+        const slabMat = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.55 });
+        const walls = [], floors = [];
         for (let k = 0; k < nFl + nRoof; k++) floors.push({ k, ring: k >= nFl ? (P.roof && P.roof.length >= 3 ? P.roof : P.env) : P.env, facs: k >= nFl ? facsRoof : facsTyp });
+        const y0 = k => P.g + FH * k;
         floors.forEach(F => {
-          const y0 = k => P.g + FH * k;
-          const slab = prism(F.ring, y0(F.k) + FH - 0.25, y0(F.k) + FH, slabMat); bGroup.add(slab);
+          const slab = prism(F.ring, y0(F.k) + FH - 0.38, y0(F.k) + FH, slabMat); bGroup.add(slab);
+          bGroup.add(new THREE.LineSegments(new THREE.EdgesGeometry(slab.geometry, 25), new THREE.LineBasicMaterial({ color: '#94a3b8', transparent: true, opacity: 0.5 })));
           F.facs.forEach(f => {
             const g = new THREE.BufferGeometry();
-            const ax = X(f.a[0]), az = Z(f.a[1]), bx = X(f.b[0]), bz = Z(f.b[1]), ya = Y(y0(F.k)) + 0.02, yb = Y(y0(F.k) + FH - 0.25);
+            const ax = X(f.a[0]), az = Z(f.a[1]), bx = X(f.b[0]), bz = Z(f.b[1]), ya = Y(y0(F.k)) + 0.02, yb = Y(y0(F.k) + FH - 0.38);
             g.setAttribute('position', new THREE.Float32BufferAttribute([ax, ya, az, bx, ya, bz, bx, yb, bz, ax, ya, az, bx, yb, bz, ax, yb, az], 3));
             g.computeVertexNormals();
-            const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.7, side: THREE.DoubleSide }));
+            const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ ...glassBase, side: THREE.DoubleSide }));
             m.castShadow = true; m.receiveShadow = true; bGroup.add(m);
+            // vertical mullions every ~1.6 m
+            const n = Math.max(1, Math.floor(f.len / 1.6)), mp = [];
+            for (let i = 1; i < n; i++) { const t = i / n, x = ax + (bx - ax) * t, z = az + (bz - az) * t; mp.push(x, ya, z, x, yb, z); }
+            if (mp.length) { const mg = new THREE.BufferGeometry(); mg.setAttribute('position', new THREE.Float32BufferAttribute(mp, 3)); const ml = new THREE.LineSegments(mg, new THREE.LineBasicMaterial({ color: '#e2e8f0', transparent: true, opacity: 0.7 })); bGroup.add(ml); walls.push({ mullions: ml }); }
             walls.push({ mesh: m, f, k: F.k, z: y0(F.k) + 1.5 });
           });
         });
-        // north arrow
-        const arrow = new THREE.ArrowHelper(new THREE.Vector3(0, 0, -1), new THREE.Vector3(0, 0.3, -120), 40, '#0f172a', 12, 7); scene.add(arrow);
-        // sun path + sun ball
-        const pathLine = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineDashedMaterial({ color: '#f59e0b', dashSize: 6, gapSize: 4 })); scene.add(pathLine);
-        const sunBall = new THREE.Mesh(new THREE.SphereGeometry(7, 24, 16), new THREE.MeshBasicMaterial({ color: '#fbbf24' })); scene.add(sunBall);
-        // breeze particles
-        const NP = 900, ppos = new Float32Array(NP * 3), pts = new THREE.Points(new THREE.BufferGeometry(), new THREE.PointsMaterial({ color: '#0284c7', size: 1.6, transparent: true, opacity: 0.75 }));
+        const topRing = floors.length ? floors[floors.length - 1].ring : P.env;
+        const roofTop = y0(nFl + nRoof);
+        const parapet = prism(topRing, roofTop, roofTop + 1.1, slabMat); bGroup.add(parapet);
+        // labels: building + nearby street names
+        const label = (txt, cls, x, y, z) => { const d = document.createElement('div'); d.textContent = txt; d.className = cls; d.dir = 'rtl'; d.style.left = '0'; d.style.top = '0'; const o = new THREE.CSS2DObject(d); o.position.set(x, y, z); scene.add(o); return o; };
+        label(p.address, 'sw3d-label sw3d-label-main', 0, Y(roofTop) + 9, 0);
+        const seen = new Map();
+        roads.forEach(([w, nm, path]) => {
+          if (!nm || nm.length < 2) return;
+          for (let i = 0; i < path.length - 1; i++) {
+            const mx = X((path[i][0] + path[i + 1][0]) / 2), mz = Z((path[i][1] + path[i + 1][1]) / 2), L = Math.hypot(path[i + 1][0] - path[i][0], path[i + 1][1] - path[i][1]), d = Math.hypot(mx, mz);
+            if (d > 170 || L < 25) continue;
+            const prev = seen.get(nm); if (!prev || d < prev.d) seen.set(nm, { d, mx, mz });
+          }
+        });
+        [...seen.entries()].sort((a, b) => a[1].d - b[1].d).slice(0, 6).forEach(([nm, o]) => label(nm, 'sw3d-label', o.mx, 2.5, o.mz));
+        label('צפון', 'sw3d-label sw3d-north', 0, 1, -150);
+        const arrow = new THREE.ArrowHelper(new THREE.Vector3(0, 0, -1), new THREE.Vector3(0, 0.4, -105), 34, '#0f172a', 10, 6); scene.add(arrow);
+        // sun path
+        const pathLine = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineDashedMaterial({ color: '#f59e0b', dashSize: 7, gapSize: 5, transparent: true, opacity: 0.9 })); scene.add(pathLine);
+        const sunBall = new THREE.Mesh(new THREE.SphereGeometry(6, 24, 16), new THREE.MeshBasicMaterial({ color: '#fde68a' })); scene.add(sunBall);
+        // breeze streaks
+        const NP = 700, ppos = new Float32Array(NP * 6), pts = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: '#0ea5e9', transparent: true, opacity: 0.55 }));
         pts.geometry.setAttribute('position', new THREE.BufferAttribute(ppos, 3)); pts.visible = false; scene.add(pts);
-        const wAz = 292.5 * Math.PI / 180, wdx = -Math.sin(wAz), wdz = Math.cos(wAz); // wind travels from WNW toward ESE
-        const seed = i => { const s = Math.sin(i * 12.9898) * 43758.5453; return s - Math.floor(s); };
-        for (let i = 0; i < NP; i++) { ppos[i * 3] = (seed(i) - 0.5) * 480; ppos[i * 3 + 1] = 2 + seed(i + 7) * 45; ppos[i * 3 + 2] = (seed(i + 3) - 0.5) * 480; }
-        api.current = { THREE, scene, cam, ctl, renderer, sun, sunBall, pathLine, walls, oldGroup, pts, ppos, wdx, wdz, around, own, P, NP };
+        const wAz = 292.5 * Math.PI / 180, wdx = -Math.sin(wAz), wdz = Math.cos(wAz);
+        const rnd = (() => { let s = 7; return () => (s = (s * 16807) % 2147483647) / 2147483647; })();
+        const reseed = (i, edge) => { const a = edge ? -260 : (rnd() - 0.5) * 520, lat = (rnd() - 0.5) * 520, h = 3 + rnd() * 48; const x = -wdx * 260 + wdz * lat + (edge ? 0 : wdx * (a + 260)), z = -wdz * 260 - wdx * lat + (edge ? 0 : wdz * (a + 260)); ppos.set([x, h, z, x + wdx * 7, h, z + wdz * 7], i * 6); };
+        for (let i = 0; i < NP; i++) reseed(i, false);
+        // post-processing: ambient occlusion + FXAA
+        let composer = null, ssao = null, fxaa = null;
+        const makeComposer = () => {
+          composer = new THREE.EffectComposer(renderer);
+          composer.addPass(new THREE.RenderPass(scene, cam));
+          ssao = new THREE.SSAOPass(scene, cam, el.clientWidth, el.clientHeight); ssao.kernelRadius = 8; ssao.minDistance = 0.0008; ssao.maxDistance = 0.045; composer.addPass(ssao);
+          fxaa = new THREE.ShaderPass(THREE.FXAAShader); const pr = renderer.getPixelRatio(); fxaa.material.uniforms.resolution.value.set(1 / (el.clientWidth * pr), 1 / (el.clientHeight * pr)); composer.addPass(fxaa);
+        };
+        try { makeComposer(); } catch (e) { composer = null; }
         const blds = around.filter(b => !own.has(b.id));
-        api.current.blds = blds;
+        api.current = { THREE, scene, cam, ctl, renderer, sun, hemi, sky, envScene, pmrem, sunBall, pathLine, walls: walls.filter(w => w.mesh), mullions: walls.filter(w => w.mullions), oldGroup, pts, ppos, wdx, wdz, reseed, NP, P, blds, glassBase, composer, el, labelR };
+        // intro flight
+        const from = new THREE.Vector3(-460, 420, 520), to = new THREE.Vector3(-125, 92, 150), t0 = performance.now();
+        cam.position.copy(from);
         const loop = () => {
           raf = requestAnimationFrame(loop);
-          if (pts.visible) { for (let i = 0; i < NP; i++) { ppos[i * 3] += wdx * 1.6; ppos[i * 3 + 2] += wdz * 1.6; if (Math.abs(ppos[i * 3]) > 250 || Math.abs(ppos[i * 3 + 2]) > 250) { ppos[i * 3] = -wdx * 240 + (seed(i + performance.now()) - 0.5) * 300 * wdz; ppos[i * 3 + 2] = -wdz * 240 + (seed(i * 3 + performance.now()) - 0.5) * 300 * -wdx; } } pts.geometry.attributes.position.needsUpdate = true; }
-          ctl.update(); renderer.render(scene, cam);
+          const k = Math.min(1, (performance.now() - t0) / 2400);
+          if (k < 1) { const e = 1 - Math.pow(1 - k, 3); cam.position.lerpVectors(from, to, e); }
+          if (pts.visible) { for (let i = 0; i < NP; i++) { ppos[i * 6] += wdx * 1.4; ppos[i * 6 + 2] += wdz * 1.4; ppos[i * 6 + 3] += wdx * 1.4; ppos[i * 6 + 5] += wdz * 1.4; if (Math.abs(ppos[i * 6]) > 270 || Math.abs(ppos[i * 6 + 2]) > 270) reseed(i, true); } pts.geometry.attributes.position.needsUpdate = true; }
+          ctl.update();
+          if (api.current.useHQ && composer) composer.render(); else renderer.render(scene, cam);
+          labelR.render(scene, cam);
         };
         loop();
-        const onResize = () => { const w = el.clientWidth, h = el.clientHeight; renderer.setSize(w, h); cam.aspect = w / h; cam.updateProjectionMatrix(); };
+        const onResize = () => { const w = el.clientWidth, h = el.clientHeight; renderer.setSize(w, h); labelR.setSize(w, h); cam.aspect = w / h; cam.updateProjectionMatrix(); if (composer) { composer.setSize(w, h); const pr = renderer.getPixelRatio(); fxaa.material.uniforms.resolution.value.set(1 / (w * pr), 1 / (h * pr)); } };
         window.addEventListener('resize', onResize); api.current.onResize = onResize;
         setSt({ phase: 'ready', err: null });
       } catch (e) { if (!dead) setSt({ phase: 'error', err: String(e && e.message || e) }); }
     })();
-    return () => { dead = true; cancelAnimationFrame(raf); if (api.current.onResize) window.removeEventListener('resize', api.current.onResize); if (renderer) { renderer.dispose(); renderer.domElement.remove(); } };
+    return () => { dead = true; cancelAnimationFrame(raf); if (api.current.onResize) window.removeEventListener('resize', api.current.onResize); if (renderer) { renderer.dispose(); renderer.domElement.remove(); } if (labelR) labelR.domElement.remove(); };
   }, [p.id]);
+  useEffect(() => { api.current.useHQ = hq; }, [hq, st.phase]);
 
-  // sun position for date/time
+  // ---- sun, sky and light for the date/time ----
   useEffect(() => {
     const A = api.current; if (st.phase !== 'ready' || !A.THREE) return;
     const [, y, m, d] = DAYS[day], off = SW.israelOffset(y, m, d);
     const pos = SW.sunPos(new Date(Date.UTC(y, m, d, 0, mins - off * 60)));
-    const vec = el => { const r = 320, e = el.el * Math.PI / 180, a = el.az * Math.PI / 180; return new A.THREE.Vector3(Math.sin(a) * Math.cos(e) * r, Math.sin(e) * r, -Math.cos(a) * Math.cos(e) * r); };
-    const v = vec(pos);
-    A.sun.position.copy(v); A.sun.intensity = pos.el > 0 ? 1.55 : 0; A.sunBall.position.copy(v.clone().multiplyScalar(0.62)); A.sunBall.visible = pos.el > 0;
-    const path = SW.daySamples(y, m, d, 10).map(s => vec(s).multiplyScalar(0.62));
+    const dir = s => { const e = s.el * Math.PI / 180, a = s.az * Math.PI / 180; return new A.THREE.Vector3(Math.sin(a) * Math.cos(e), Math.sin(e), -Math.cos(a) * Math.cos(e)); };
+    const v = dir(pos), up = pos.el > 0;
+    A.sky.material.uniforms.sunPosition.value.copy(v);
+    A.sun.position.copy(v.clone().multiplyScalar(600)); A.sun.intensity = up ? 0.6 + 2.2 * Math.min(1, pos.el / 25) : 0;
+    A.hemi.intensity = up ? 0.35 + 0.25 * Math.min(1, pos.el / 30) : 0.12;
+    A.renderer.toneMappingExposure = up ? 0.5 + 0.18 * Math.min(1, pos.el / 30) : 0.25;
+    A.sunBall.position.copy(v.clone().multiplyScalar(230)); A.sunBall.visible = up;
+    const path = SW.daySamples(y, m, d, 10).map(s => dir(s).multiplyScalar(230));
     A.pathLine.geometry.dispose(); A.pathLine.geometry = new A.THREE.BufferGeometry().setFromPoints(path); A.pathLine.computeLineDistances();
+    clearTimeout(A.envT); A.envT = setTimeout(() => { try { const rt = A.pmrem.fromScene(A.envScene); if (A.envRT) A.envRT.dispose(); A.envRT = rt; A.scene.environment = rt.texture; } catch (e) {} }, 120);
     if (mode === 'live') A.walls.forEach(w => {
-      const sx = Math.sin(pos.az * Math.PI / 180), sy = Math.cos(pos.az * Math.PI / 180), facing = w.f.nx * sx + w.f.ny * sy > 0.05 && pos.el > 0;
+      const sx = Math.sin(pos.az * Math.PI / 180), sy = Math.cos(pos.az * Math.PI / 180), facing = w.f.nx * sx + w.f.ny * sy > 0.05 && up;
       const lit = facing && w.f.pts.some(q => !SW.blocked(q[0], q[1], w.z, pos.az, pos.el, A.blds));
-      w.mesh.material.color.set(lit ? '#FCD34D' : '#64748B');
+      w.mesh.material.color.set(lit ? '#FCD34D' : '#475569'); w.mesh.material.metalness = 0; w.mesh.material.roughness = 0.6;
     });
   }, [st.phase, day, mins, mode]);
 
-  // facade colouring for analytic modes + per-floor grid
+  // ---- facade colouring for the analysis modes + per-floor table ----
   useEffect(() => {
-    const A = api.current; if (st.phase !== 'ready' || mode === 'live') return;
+    const A = api.current; if (st.phase !== 'ready') return;
+    A.pts.visible = mode === 'wind';
+    A.mullions.forEach(w => { w.mullions.visible = mode === 'model'; });
+    if (mode === 'model') { A.walls.forEach(w => { Object.assign(w.mesh.material, { metalness: A.glassBase.metalness, roughness: A.glassBase.roughness, envMapIntensity: A.glassBase.envMapIntensity }); w.mesh.material.color.set(A.glassBase.color); }); setGrid(null); return; }
+    if (mode === 'live') return;
     const t0 = setTimeout(() => {
       const cells = A.walls.map(w => {
         let v;
         if (mode === 'winter' || mode === 'summer') v = SW.facadeSun(w.f, w.z, A.blds, mode, 15).hours;
         else if (mode === 'heat') v = SW.westHeat(w.f, w.z, A.blds, 15);
         else v = SW.breeze([w.f], w.z, A.blds, A.P.sea);
-        w.mesh.material.color.set(swColor(mode, v)); return { k: w.k, az: w.f.az, len: w.f.len, v };
+        w.mesh.material.color.set(swColor(mode, v)); w.mesh.material.metalness = 0; w.mesh.material.roughness = 0.55;
+        return { k: w.k, az: w.f.az, len: w.f.len, v };
       });
       const byK = {};
       cells.forEach(c => { const dir = ['צפון', 'מזרח', 'דרום', 'מערב'][Math.round(((c.az + 360) % 360) / 90) % 4]; byK[c.k] = byK[c.k] || {}; const o = byK[c.k][dir] || { v: 0, len: 0 }; o.v += c.v * c.len; o.len += c.len; byK[c.k][dir] = o; });
       setGrid(Object.entries(byK).map(([k, o]) => ({ k: +k, d: Object.fromEntries(Object.entries(o).map(([dd, x]) => [dd, x.v / x.len])) })).sort((a, b) => b.k - a.k));
     }, 30);
-    A.pts.visible = mode === 'wind';
     return () => clearTimeout(t0);
   }, [st.phase, mode]);
   useEffect(() => { const A = api.current; if (A.oldGroup) A.oldGroup.visible = showOld; }, [showOld, st.phase]);
   useEffect(() => { if (!play) return; const id = setInterval(() => setMins(m => m >= 20 * 60 ? 5 * 60 : m + 5), 90); return () => clearInterval(id); }, [play]);
 
   const hhmm = m => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
-  const MODES = [['winter', 'שמש בחורף'], ['summer', 'שמש בקיץ'], ['heat', 'חום מערבי בקיץ'], ['wind', 'בריזה'], ['live', 'אור וצל ברגע הזה']];
+  const MODES = [['model', 'מודל'], ['winter', 'שמש בחורף'], ['summer', 'שמש בקיץ'], ['heat', 'חום מערבי'], ['wind', 'בריזה'], ['live', 'אור וצל עכשיו']];
   const unit = mode === 'wind' ? '' : ' ש׳';
-  const LEG = { winter: 'שעות שמש ישירה ב-21 בדצמבר', summer: 'שעות שמש ישירה ב-21 ביוני', heat: 'שעות שמש מערבית אחרי 13:00 ב-21 ביוני', wind: 'מדד בריזה 0–10 (ממערב-צפון מערב)', live: 'צהוב = שמש עכשיו, אפור = צל' }[mode];
+  const LEG = { model: 'הבניין שהתכנית מתירה, בתוך השכונה האמיתית', winter: 'שעות שמש ישירה ב-21 בדצמבר', summer: 'שעות שמש ישירה ב-21 ביוני', heat: 'שעות שמש מערבית אחרי 13:00 ב-21 ביוני', wind: 'מדד בריזה 0–10 (ממערב-צפון מערב)', live: 'צהוב = שמש עכשיו, כהה = צל' }[mode];
   return (
-    <div className="fixed inset-0 z-[90] bg-ink/60 grid place-items-center p-2 sm:p-4" role="dialog" aria-modal="true" aria-label="שמש ורוח בתלת-ממד">
-      <div className="bg-white rounded-2xl shadow-pop w-full max-w-[1280px] h-[calc(100vh-16px)] sm:h-[calc(100vh-32px)] flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-[90] bg-ink/70 grid place-items-center p-2 sm:p-4" role="dialog" aria-modal="true" aria-label="שמש ורוח בתלת-ממד">
+      <style>{`.sw3d-label{font:600 12px Heebo,system-ui,sans-serif;color:#334155;background:rgba(255,255,255,.82);padding:2px 7px;border-radius:999px;white-space:nowrap;box-shadow:0 1px 3px rgba(15,23,42,.15)}.sw3d-label-main{font-size:13px;font-weight:800;color:#fff;background:#2563eb}.sw3d-north{background:#0f172a;color:#fff}`}</style>
+      <div className="bg-white rounded-2xl shadow-pop w-full max-w-[1320px] h-[calc(100vh-16px)] sm:h-[calc(100vh-32px)] flex flex-col overflow-hidden">
         <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-line">
-          <div className="min-w-0"><div className="text-[15px] font-bold text-ink truncate">שמש ורוח · {p.address}</div><div className="text-2xs text-ink-3">{planned ? `הבניין שהתכנית מתירה: ${nFl} קומות${nRoof ? ` + ${nRoof} קומות גג` : ''}` : 'הבניין הקיים'}, מול הבניינים האמיתיים בסביבה</div></div>
-          <button onClick={onClose} className="p-1.5 rounded-md text-ink-3 hover:bg-canvas" aria-label="סגירה"><Icon name="x" className="w-5 h-5" /></button>
+          <div className="min-w-0"><div className="text-[15px] font-bold text-ink truncate">שמש ורוח · {p.address}</div><div className="text-2xs text-ink-3">{planned ? `הבניין שהתכנית מתירה: ${nFl} קומות${nRoof ? ` + ${nRoof} קומות גג` : ''}` : 'הבניין הקיים'}, מול הבניינים והרחובות האמיתיים בסביבה</div></div>
+          <div className="flex items-center gap-2">
+            <label className="inline-flex items-center gap-1 text-2xs text-ink-2"><input type="checkbox" checked={hq} onChange={e => setHq(e.target.checked)} />איכות גבוהה</label>
+            <button onClick={onClose} className="p-1.5 rounded-md text-ink-3 hover:bg-canvas" aria-label="סגירה"><Icon name="x" className="w-5 h-5" /></button>
+          </div>
         </div>
         <div className="flex-1 min-h-0 grid lg:grid-cols-[1fr_340px]">
-          <div className="relative min-h-[320px]">
+          <div className="relative min-h-[320px] bg-[#e9eef4]">
             <div ref={host} className="absolute inset-0" />
             {st.phase !== 'ready' && <div className="absolute inset-0 grid place-items-center text-[13px] text-ink-2 bg-white/70">{st.phase === 'error' ? `לא הצלחתי לטעון את התלת-ממד (${st.err}).` : 'בונה את הבניין והשכונה בתלת-ממד…'}</div>}
-            <div className="absolute top-2 start-2 flex flex-wrap gap-1">{MODES.map(([k, l]) => <button key={k} onClick={() => setMode(k)} className={`h-8 px-2.5 rounded-lg text-[12px] font-semibold shadow-card ${mode === k ? 'bg-ink text-white' : 'bg-white/95 text-ink-2'}`}>{l}</button>)}</div>
-            <div className="absolute bottom-2 inset-x-2 rounded-xl bg-white/95 shadow-card p-2 grid gap-1.5">
+            <div className="absolute top-2 start-2 flex flex-wrap gap-1">{MODES.map(([k, l]) => <button key={k} onClick={() => setMode(k)} className={`h-8 px-2.5 rounded-lg text-[12px] font-semibold shadow-card backdrop-blur ${mode === k ? 'bg-ink text-white' : 'bg-white/90 text-ink-2'}`}>{l}</button>)}</div>
+            <div className="absolute bottom-2 inset-x-2 rounded-xl bg-white/92 backdrop-blur shadow-card p-2 grid gap-1.5">
               <div className="flex flex-wrap items-center gap-2">
                 {Object.entries(DAYS).map(([k, [l]]) => <button key={k} onClick={() => setDay(k)} className={`h-7 px-2 rounded-md text-[12px] font-semibold ${day === k ? 'bg-accent text-white' : 'bg-canvas text-ink-2'}`}>{l}</button>)}
                 <button onClick={() => setPlay(x => !x)} className="h-7 px-2.5 rounded-md text-[12px] font-bold bg-ink text-white">{play ? 'עצירה' : 'הפעלת יום'}</button>
@@ -3250,21 +3374,22 @@ function SunWind3D({ p, onClose }) {
                 <label className="ms-auto inline-flex items-center gap-1 text-2xs text-ink-2"><input type="checkbox" checked={showOld} onChange={e => setShowOld(e.target.checked)} />הבניין הקיים (שקוף)</label>
               </div>
               <input type="range" min={300} max={1200} step={5} value={mins} onChange={e => { setPlay(false); setMins(+e.target.value); }} aria-label="שעה ביום" className="w-full accent-accent" />
-              <div className="flex items-center gap-2 text-2xs text-ink-2"><span>{LEG}</span>{mode !== 'live' && <span className="h-2.5 flex-1 rounded-full" style={{ background: `linear-gradient(to left, ${SW_COLORS[mode].map(c => c[1]).join(',')})` }} />}{mode !== 'live' && <span className="num">{SW_COLORS[mode][0][0]}–{SW_COLORS[mode][SW_COLORS[mode].length - 1][0]}{unit}</span>}</div>
+              <div className="flex items-center gap-2 text-2xs text-ink-2"><span>{LEG}</span>{SW_COLORS[mode] && <span className="h-2.5 flex-1 rounded-full" style={{ background: `linear-gradient(to left, ${SW_COLORS[mode].map(c => c[1]).join(',')})` }} />}{SW_COLORS[mode] && <span className="num">{SW_COLORS[mode][0][0]}–{SW_COLORS[mode][SW_COLORS[mode].length - 1][0]}{unit}</span>}</div>
             </div>
           </div>
           <div className="border-s border-line overflow-y-auto scroll-thin p-3 grid content-start gap-3">
             <Plain open items={[
-              ['מה רואים', 'הבניין שהתכנית מתירה בחלקה, בצבעים, בתוך הבניינים האמיתיים שמסביב (אפור). הקו הכחול הוא גבול המגרש, החץ השחור מצביע צפונה, והקו הכתום הוא מסלול השמש ביום שבחרתם.'],
-              ['איך משתמשים', 'גוררים כדי לסובב, גלגלת כדי להתקרב. בוחרים יום ושעה, או ״הפעלת יום״ כדי לראות את הצל זז. כל צבע על הקיר הוא קומה אחת בחזית אחת.'],
+              ['מה רואים', 'הבניין שהתכנית מתירה בחלקה (זכוכית כחלחלה), בתוך הבניינים והרחובות האמיתיים שמסביב, כדגם לבן. המגרש מסומן בכחול, ומסלול השמש ביום שבחרתם בקו כתום.'],
+              ['איך משתמשים', 'גוררים כדי לסובב, גלגלת כדי להתקרב. בוחרים יום ושעה, או ״הפעלת יום״ כדי לראות את הצל זז. במצבי הניתוח כל צבע על הקיר הוא קומה אחת בחזית אחת.'],
               ['מה המספרים אומרים', 'שמש בחורף היא היתרון הכי מבוקש: 3 שעות ויותר ב-21 בדצמבר זה טוב. שמש מערבית בקיץ אחר הצהריים מחממת, ומוסיפה מזגן. בריזה גבוהה = פתוח לרוח הים.'],
               ['גבולות', 'הבניין החדש משורטט לפי קווי הבניין, לא לפי תכנון אדריכלי. הבריזה היא מדד חשיפה, לא מדידת רוח. עצים לא נכללים.']
             ]} />
-            {grid && mode !== 'live' && <div className="border border-line rounded-lg overflow-hidden">
+            {grid && <div className="border border-line rounded-lg overflow-hidden">
               <div className="px-2 py-1.5 bg-canvas text-2xs font-bold text-ink-2">{LEG}, לפי קומה וכיוון חזית</div>
               <table className="w-full text-[12px]"><thead className="text-2xs text-ink-3"><tr className="[&>th]:px-1.5 [&>th]:py-1 [&>th]:text-start"><th>קומה</th>{['צפון', 'מזרח', 'דרום', 'מערב'].map(x => <th key={x}>{x}</th>)}</tr></thead>
                 <tbody>{grid.map(r => <tr key={r.k} className="border-t border-line-soft [&>td]:px-1.5 [&>td]:py-0.5"><td className="text-ink-2">{floorName(r.k)}</td>{['צפון', 'מזרח', 'דרום', 'מערב'].map(x => <td key={x}>{r.d[x] != null ? <span className="inline-flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ background: swColor(mode, r.d[x]) }} /><Num>{r.d[x].toFixed(1)}</Num></span> : <span className="text-ink-4">—</span>}</td>)}</tr>)}</tbody></table>
             </div>}
+            {!grid && mode === 'model' && <div className="text-2xs text-ink-3">בחרו ״שמש בחורף״, ״שמש בקיץ״, ״חום מערבי״ או ״בריזה״ כדי לראות טבלה לפי קומה וחזית.</div>}
           </div>
         </div>
       </div>
@@ -3343,6 +3468,114 @@ function TabuSection({ p, legalSigned }) {
         </div></div>
       </div>
     </Section>
+  );
+}
+
+const FIND_ZONES = [['3', 'רובע 3'], ['4', 'רובע 4'], ['5-6', 'רובעים 5–6'], ['ig', 'אבן גבירול']];
+function FinderView({ dev, onOpen, compare, toggleCompare, onCompare, onMemo }) {
+  const [zone, setZone] = useState('4');
+  const [sortBy, setSortBy] = useState('profit');
+  const base = devWithBase(dev.values);
+  const softMissing = !['mgmt', 'architect', 'fees', 'rent'].some(k => dev.values && num0(dev.values[k]));
+  const list = useMemo(() => {
+    const recs = AREA_BY_ZONE[zone] || [], seen = new Set(), out = [];
+    recs.forEach((r, i) => { const id = r.st_ + '-' + r.n; if (seen.has(id)) return; seen.add(id); const P = genParcelC(r.st_, r.n, i, recs.length, OVR[`${r.g}-${r.c}`]); P.econ = econ(P, base.values); out.push(P); });
+    // residential urban-renewal candidates only: no hospitals/schools/public plots (huge lots), no single houses, not wholly state-owned
+    return out.filter(P => P.status !== 'signed' && P.status !== 'file' && P.stage !== 'skip' && P.verifiedAdd > 0 && P.inputs.lotArea <= 3000 && P.units >= 4
+      && !(P.ownReal && !P.ownTypes.includes('פרטית')) && P.verifiedAdd <= 8000);
+  }, [zone, dev.values, FEAS, OVR]);
+  const prof = P => P.econ && P.econ.state === 'ok' ? P.econ.best.profit : -1e15;
+  const sorted = [...list].sort((a, b) => sortBy === 'profit' ? prof(b) - prof(a) : sortBy === 'rights' ? b.verifiedAdd - a.verifiedAdd : b.score - a.score);
+  const top = sorted.slice(0, 10);
+  const BT = BACKTEST;
+  return (
+    <div className="grid gap-3">
+      <div className="rounded-2xl bg-ink text-white p-4 grid gap-2">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div><div className="text-[20px] font-extrabold leading-tight">ההזדמנויות המובילות עכשיו</div><div className="text-[13px] text-white/75 mt-0.5">בניינים בלי יזם ידוע, עם הכי הרבה תוספת לפי התכנית והכי הרבה רווח צפוי. לחיצה על בניין פותחת את הניתוח המלא.</div></div>
+          <div className="flex flex-wrap gap-1">{FIND_ZONES.map(([z, l]) => <button key={z} onClick={() => setZone(z)} className={`h-8 px-3 rounded-lg text-[12.5px] font-bold ${zone === z ? 'bg-white text-ink' : 'bg-white/10 text-white hover:bg-white/20'}`}>{l}</button>)}</div>
+        </div>
+        <div className="flex flex-wrap items-center gap-3 text-[12px] text-white/80">
+          <span>{n0(list.length)} בניינים פנויים ברובע · מוצגים 10 המובילים</span>
+          <label className="inline-flex items-center gap-1">מיון<select value={sortBy} onChange={e => setSortBy(e.target.value)} className="h-7 rounded bg-white/10 text-white text-[12px] px-1"><option value="profit" className="text-ink">{softMissing ? 'עודף לפני עלויות רכות' : 'רווח צפוי'}</option><option value="rights" className="text-ink">תוספת זכויות</option><option value="score" className="text-ink">ציון סינון</option></select></label>
+          {base.base && <span className="inline-flex items-center gap-1 rounded bg-amber-400/20 text-amber-100 px-1.5 py-0.5">רווח לפי ״בסיס שוק״ ציבורי <Info text={`ערכים שלא הזנתם נלקחו מבסיס שוק ציבורי: ${BASELINE && BASELINE.source ? BASELINE.source : ''}. הזינו פרמטרים משלכם כדי לקבל את הרווח שלכם.`} /></span>}
+        </div>
+        {BT && <div className="rounded-lg bg-white/10 px-3 py-2 text-[12.5px] leading-snug"><b>הוכחה מהעבר:</b> {BT.headline} <Info text={BT.detail} /></div>}
+      </div>
+      <ol className="grid gap-2">
+        {top.map((P, i) => { const W = whyChips(P), e = P.econ, on = compare.includes(P.id); return (
+          <li key={P.id} className="rounded-xl border border-line bg-card shadow-card p-3 grid sm:grid-cols-[34px_1fr_auto] gap-3 items-start">
+            <div className="num w-8 h-8 rounded-full bg-accent text-white font-extrabold grid place-items-center">{i + 1}</div>
+            <div className="min-w-0">
+              <button onClick={() => onOpen(P)} className="text-[16px] font-extrabold text-ink hover:text-accent text-start">{P.address}</button>
+              <div className="text-2xs text-ink-3">גוש <Num>{P.gush}</Num> · חלקה <Num>{P.chelka}</Num> · {P.condoRegistered && P.ownReal ? '' : '~'}<Num>{P.units}</Num> דירות · נבנה <Num>{P.year}</Num> · <StageChip p={P} /></div>
+              <div className="flex flex-wrap gap-1 mt-1.5">{W.good.slice(0, 5).map(t => <span key={t} className="text-[11.5px] font-semibold px-1.5 py-0.5 rounded-md bg-go-soft text-go-ink">{t}</span>)}{W.risk.slice(0, 2).map(t => <span key={t} className="text-[11.5px] font-semibold px-1.5 py-0.5 rounded-md bg-act-soft text-act-ink">{t}</span>)}</div>
+            </div>
+            <div className="text-end grid gap-1 justify-items-end">
+              {e && e.state === 'ok' ? (softMissing ? <><Num className="text-[18px] font-extrabold text-ink">{ils2(e.best.profit)}</Num><div className="text-2xs font-semibold text-act-ink">עודף לפני עלויות רכות, שכירות ומימון</div><div className="text-2xs text-ink-3">הכנסות <Num>{ils(e.best.revEx)}</Num> · ביצוע <Num>{ils(e.best.construction)}</Num></div></> : <><Num className={`text-[18px] font-extrabold ${e.ok ? 'text-go-ink' : 'text-ink'}`}>{ils2(e.best.profit)}</Num><div className="text-2xs text-ink-3">רווח צפוי · <Num>{pct(e.best.pct, 0)}</Num> מהעלות</div></>) : <div className="text-2xs text-ink-3">אין חישוב רווח</div>}
+              <div className="flex gap-1.5 mt-1"><Btn variant={on ? 'soft' : 'ghost'} className="h-8 px-2.5" onClick={() => toggleCompare(P)} aria-pressed={on}>{on ? 'בהשוואה ✓' : 'להשוואה'}</Btn><Btn variant="ghost" className="h-8 px-2.5" onClick={() => onMemo(P)}>סיכום עסקה</Btn><Btn variant="primary" className="h-8 px-2.5" onClick={() => onOpen(P)}>ניתוח מלא</Btn></div>
+            </div>
+          </li>); })}
+        {!top.length && <li className="text-[13px] text-ink-3 p-4">אין ברובע הזה בניינים פנויים עם תוספת זכויות.</li>}
+      </ol>
+      {compare.length > 0 && <div className="sticky bottom-2 z-20 rounded-xl bg-ink text-white shadow-pop px-3 py-2 flex flex-wrap items-center gap-2"><span className="text-[13px] font-semibold">{compare.length} בניינים להשוואה</span><Btn variant="primary" className="h-8 px-3" onClick={onCompare} disabled={compare.length < 2}>השוואה זה מול זה</Btn><span className="text-2xs text-white/60">עד 3 בניינים</span></div>}
+    </div>
+  );
+}
+
+function memoData(p) {
+  const e = p.econ || econ(p, devWithBase(null).values), b = e && e.state === 'ok' ? e.best : null, L = swLevels(p), W = whyChips(p);
+  const fut = p.ctx && p.ctx.adj && p.ctx.adj[0];
+  return [
+    ['תכנית', { '3': 'תא/3616א (רובע 3)', '4': 'תא/3729א (רובע 4)', '5-6': 'תא/מק/4320 (רובעים 5–6)', 'ig': 'תא/4562' }[p.inputs.rova]],
+    ['מגרש', `${n0(p.inputs.lotArea)} מ״ר`],
+    ['קיים', `${n0(p.calc.existing)} מ״ר${p.calc.ex && p.calc.ex.existingReal ? '' : ' (הערכה)'}`],
+    ['מותר לפי התכנית', p.calc.best ? `${n0(p.calc.best.total)} מ״ר · ${p.calc.best.short}` : '—'],
+    ['תוספת', p.verifiedAdd != null ? `+${n0(p.verifiedAdd)} מ״ר` : '—'],
+    ['דירות / בעלים', `${p.units}${p.ownReal ? '' : ' (הערכה)'}`],
+    ['שלב', STAGE[p.stage].label],
+    b && !b.fixed && !b.owners ? ['עודף לפני עלויות רכות', `${ils2(b.profit)} (הכנסות ${ils(b.revEx)}, ביצוע ${ils(b.construction)}; בלי עלויות רכות, שכירות ומימון)`] : ['רווח צפוי', b ? `${ils2(b.profit)} (${pct(b.pct, 0)} מהעלות, ${pct(b.pctSales, 0)} מהמכירות)` : '—'],
+    ['שמש בחורף', L ? `${Math.round(L.sunScore * 100)}% מהחזיתות מקבלות 3 ש׳ ומעלה` : '—'],
+    ['בריזה (קומה עליונה)', L && L.rows.length ? `${L.rows[L.rows.length - 1].breeze.toFixed(1)} / 10` : '—'],
+    ['תחבורה עתידית', fut ? `${TRANSIT[fut.line].label} · ${fmtM(fut.d)}` : '—'],
+    ['למה', W.good.join(' · ') || '—'],
+    ['סיכונים', W.risk.join(' · ') || 'לא זוהו'],
+  ];
+}
+function CompareModal({ items, onClose, onOpen }) {
+  const rows = items.map(memoData);
+  return (
+    <Modal title="השוואה זה מול זה" onClose={onClose} wide footer={<Btn variant="ghost" className="h-9 px-3" onClick={onClose}>סגירה</Btn>}>
+      <div className="overflow-x-auto"><table className="w-full text-[12.5px] min-w-[620px]">
+        <thead><tr><th className="w-[130px]"></th>{items.map(P => <th key={P.id} className="text-start p-2"><button onClick={() => onOpen(P)} className="text-[15px] font-extrabold text-ink hover:text-accent">{P.address}</button><div className="text-2xs font-normal text-ink-3">גוש <Num>{P.gush}</Num> · חלקה <Num>{P.chelka}</Num></div></th>)}</tr></thead>
+        <tbody>{rows[0].map(([label], ri) => (
+          <tr key={label} className="border-t border-line-soft align-top"><td className="p-2 text-2xs font-bold text-ink-3">{label}</td>{rows.map((r, ci) => <td key={ci} className="p-2 text-ink">{r[ri][1]}</td>)}</tr>))}</tbody>
+      </table></div>
+    </Modal>
+  );
+}
+function MemoModal({ p, onClose }) {
+  const rows = memoData(p);
+  const printIt = () => { try { window.print(); } catch (e) {} };
+  const poly = p.poly ? (Array.isArray(p.poly) ? p.poly : JSON.parse(p.poly)) : null;
+  let svg = null;
+  if (poly) { const xs = poly.map(q => q[0]), ys = poly.map(q => q[1]), x0 = Math.min(...xs), y0 = Math.min(...ys), w = Math.max(...xs) - x0 || 1, h = Math.max(...ys) - y0 || 1, s2 = 150 / Math.max(w, h); svg = <svg viewBox={`-6 -6 ${w * s2 + 12} ${h * s2 + 12}`} className="w-[120px] h-[120px]"><polygon points={poly.map(q => `${(q[0] - x0) * s2},${(h - (q[1] - y0)) * s2}`).join(' ')} fill="#dbeafe" stroke="#2563eb" strokeWidth="2" /></svg>; }
+  return (
+    <Modal title="סיכום עסקה" onClose={onClose} wide footer={<>
+      <span className="text-2xs text-ink-3 me-auto">״הדפסה״ פותח את חלון ההדפסה, ושם בוחרים ״שמירה כ-PDF״.</span>
+      <Btn variant="ghost" className="h-9 px-3" onClick={onClose}>סגירה</Btn><Btn variant="primary" className="h-9 px-3" onClick={printIt}>הדפסה / PDF</Btn>
+    </>}>
+      <style>{`@media print{body *{visibility:hidden!important}.deal-memo,.deal-memo *{visibility:visible!important}.deal-memo{position:fixed;inset:0;padding:24px;background:#fff}}`}</style>
+      <div className="deal-memo grid gap-3 text-ink">
+        <div className="flex items-start justify-between gap-3 border-b border-line pb-2">
+          <div><div className="text-2xs text-ink-3">ISRA-PROP · סיכום עסקה · {new Date().toLocaleDateString('he-IL')}</div><div className="text-[22px] font-extrabold">{p.address}, תל אביב-יפו</div><div className="text-[12px] text-ink-2">גוש <Num>{p.gush}</Num> · חלקה <Num>{p.chelka}</Num> · נבנה <Num>{p.year}</Num> · {p.hood}</div></div>
+          {svg}
+        </div>
+        <p className="text-[13px] leading-relaxed">{p.ai}</p>
+        <table className="w-full text-[12.5px]"><tbody>{rows.map(([l, v]) => <tr key={l} className="border-t border-line-soft align-top"><td className="py-1 pe-3 w-[150px] font-bold text-ink-3">{l}</td><td className="py-1">{v}</td></tr>)}</tbody></table>
+        <div className="text-[10.5px] text-ink-3 leading-snug border-t border-line pt-2">מקורות: GIS עיריית תל אביב-יפו, תקנוני התכניות, פרוטוקולי הוועדה המקומית, פנקסי המקרקעין (data.gov.il), nadlan.gov.il{BASELINE && BASELINE.source ? `, ${BASELINE.source}` : ''}. כלי סינון, לא שמאות ולא ייעוץ משפטי. הקו הקדמי ושטח הקיים עשויים להיות הערכה; לפני עסקה נדרשים תיק מידע, נסח טאבו ובדיקת שמאי.</div>
+      </div>
+    </Modal>
   );
 }
 
@@ -3565,6 +3798,10 @@ const useMedia = q => { const [m, setM] = useState(() => window.matchMedia(q).ma
 function App() {
   const [dev, saveDev] = useDevParams();
   const [lst, writeListing] = useListings();
+  const [view0, setView0] = useState('finder');
+  const [compare, setCompare] = useState([]);
+  const [cmpItems, setCmpItems] = useState(null);
+  const [memoP, setMemoP] = useState(null);
   const [nv, saveNesach, removeNesach] = useNesach();
   const [devOpen, setDevOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(() => { try { return !localStorage.getItem('israprop.about.seen'); } catch (e) { return true; } });
@@ -3664,6 +3901,8 @@ function App() {
     setExtra({ streetId: item.streetId, num: item.num, idx: 0, total: 1 }); setSelectedId(item.id);
   };
 
+  const openFinder = P => { setView0('scan'); const t = SEARCH_INDEX.find(x => x.type === 'street' && x.id === P.streetId); if (t) { setTarget(t); setQuery(t.he); setScan(scanList(t)); } setSelectedId(P.id); };
+  const toggleCompare = P => setCompare(c => c.some(x => x.id === P.id) ? c.filter(x => x.id !== P.id) : c.length >= 3 ? c : [...c, P]);
   const inspector = selected && (
     <Inspector onOpenDev={() => setDevOpen(true)} p={selected} overlay={!isXL} saved={isSaved} onClose={() => setSelectedId(null)}
       onOpen3D={() => setModal('sw3d')} onOpenFeas={() => setModal('feas')} onOverride={onOverride} onReset={onResetOverrides} openRule={id => setRulesFocus(id)}
@@ -3679,6 +3918,10 @@ function App() {
         chips={chips} toggleChip={toggleChip} pipeline={pipeline} onOpenParcel={openFromPipeline} parcelsById={parcelsById}
         onRemovePipeline={id => setPipeline(pl => pl.filter(x => x.id !== id))} />
 
+      <div className="shell pt-2 flex flex-wrap items-center gap-1" role="tablist" aria-label="תצוגה">
+        {[['finder', 'הזדמנויות מובילות'], ['scan', 'סריקה מלאה']].map(([k, l]) => <button key={k} role="tab" aria-selected={view0 === k} onClick={() => setView0(k)} className={`h-8 px-3 rounded-lg text-[13px] font-bold ${view0 === k ? 'bg-ink text-white' : 'bg-card border border-line text-ink-2 hover:bg-canvas'}`}>{l}</button>)}
+      </div>
+      {view0 === 'finder' ? <main className="shell flex-1 py-3 w-full max-w-[1100px] mx-auto"><FinderView dev={dev} onOpen={openFinder} compare={compare.map(x => x.id)} toggleCompare={toggleCompare} onCompare={() => setCmpItems(compare)} onMemo={P => setMemoP(P)} /></main> : (
       <main className={`shell flex-1 min-h-0 py-3 grid gap-3 grid-cols-1 lg:grid-cols-[320px_minmax(0,1fr)] ${selected && isXL ? 'xl:grid-cols-[300px_minmax(0,1fr)_410px] 2xl:grid-cols-[340px_minmax(0,1fr)_470px]' : 'xl:grid-cols-[300px_minmax(0,1fr)] 2xl:grid-cols-[340px_minmax(0,1fr)]'}`}>
         <aside className="min-w-0 grid gap-3 content-start xl:min-h-0 xl:overflow-y-auto scroll-thin" aria-label="סקירה מרחבית וקדסטרלית">
           <MapSwitch parcels={parcels.length > 400 ? rows.slice(0, 200) : parcels} visibleIds={chips.length || tab !== 'all' ? visibleIds : null} selectedId={selected?.id}
@@ -3695,6 +3938,7 @@ function App() {
 
         {isXL && selected && <aside key={selected.id} className="min-w-0 min-h-0" aria-label="בוחן נכס">{inspector}</aside>}
       </main>
+      )}
 
       {!isXL && selected && (
         <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="בוחן נכס">
@@ -3708,6 +3952,8 @@ function App() {
       {aboutOpen && <AboutModal onClose={closeAbout} onOpenDev={() => setDevOpen(true)} />}
       {devOpen && <DevParamsModal dev={dev} onSave={saveDev} onClose={() => setDevOpen(false)} toast={toast} />}
       {rulesFocus !== null && <RulesModal focusId={rulesFocus} onClose={() => setRulesFocus(null)} />}
+      {cmpItems && <CompareModal items={cmpItems} onClose={() => setCmpItems(null)} onOpen={P => { setCmpItems(null); openFinder(P); }} />}
+      {memoP && <MemoModal p={memoP} onClose={() => setMemoP(null)} />}
       {modal === 'sw3d' && selected && <SunWind3D p={selected} onClose={() => setModal(null)} />}
       {modal === 'feas' && selected && <FeasModal p={selected} dev={dev.values} onClose={() => setModal(null)} toast={toast} />}
       {modal === 'order' && <OrderListModal rows={rows} onClose={() => setModal(null)} toast={toast} />}
