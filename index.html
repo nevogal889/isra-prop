@@ -220,7 +220,8 @@ const minConf = ids => ids.map(id => RULE_BY_ID[id]?.conf || 'low').reduce((a, c
 function computeRights(x) {
   const resFloors = Math.max(1, x.floors - (x.pilotis ? 1 : 0));
   const roofExisting = x.roofBuilt ? Math.round(x.typ * 0.4) : 0;
-  const existing = Math.round(x.typ * resFloors + (x.pilotis ? x.typ * 0.15 : 0)) + roofExisting;
+  const existingEst = Math.round(x.typ * resFloors + (x.pilotis ? x.typ * 0.15 : 0)) + roofExisting;
+  const existing = x.existingReal > 0 ? Math.round(x.existingReal) : existingEst; // real area from a fees calculation / permit file beats the GIS estimate
   const decl = x.declared, r34 = x.rova === '3' || x.rova === '4';
   const low = x.rova === '4' && !!x.low;
 
@@ -332,6 +333,7 @@ function computeRights(x) {
     reb.rules.push('g-lines');
     if (r34) reb.rules.push('t5000-rova');
     reb.short = `${n}${roofs === 2 ? ' + 2 גג' : roofs ? ' + גג' : ''} (הריסה)`;
+    reb.n = n; reb.roofs = roofs;
   }
   if (r56 && reb.available) {
     let a = reb.parts.reduce((t, p) => t + p.sqm, 0);
@@ -389,7 +391,7 @@ function computeRights(x) {
   const verified = best && !pend && best.conf !== 'low' ? best.total : null;
   if (low) flags.push({ tone: 'warn', rule: 'r4-low', text: x.cottage ? `החלקה בתחום תכנית ${x.low} לבנייה נמוכה, וכנראה קוטג׳. אין מסלול יזמי של הריסה ובנייה או תוספת קומות.` : `החלקה בתחום תכנית ${x.low} לבנייה נמוכה (שיכון): עד 3 או 4 קומות + גג, לפי מיקום המגרש בתשריט 3729א. המנוע מאמת 3 ומציג 4 בטווח.` });
   const range = { lo: best && !pend ? best.total : existing, hi: Math.max(totals.discretion, best ? best.total : existing, lowHi) };
-  const ex = { geo: g ? 'real' : 'rect', side, rear, front: 4, wNew: Math.round(wNew * 10) / 10, dNew: Math.round(dNew * 10) / 10, depthLot: Math.round(depthLot * 10) / 10, typNewHi, typNewLo, capped55, roofNew, resFloors, roofExisting, fs: g ? g.fs : null };
+  const ex = { existingEst, existingReal: x.existingReal > 0, geo: g ? 'real' : 'rect', side, rear, front: 4, wNew: Math.round(wNew * 10) / 10, dNew: Math.round(dNew * 10) / 10, depthLot: Math.round(depthLot * 10) / 10, typNewHi, typNewLo, capped55, roofNew, resFloors, roofExisting, fs: g ? g.fs : null };
   return { existing, ceiling, typNew, add, reb, sAdd, sReb, best, adjustments, opps, totals, flags, pend, verified, range, ex };
 }
 
@@ -539,7 +541,7 @@ function baseInputsReal(streetId, num) {
     lotArea: R.lot || mb.lotArea, typ,
     frontage: R.fr && R.fr > 4 ? Math.round(R.fr * 10) / 10 : mb.frontage,
     floors: R.fl ? R.fl + 1 : mb.floors, pilotis: !!R.pil,
-    basement: 0, basementUnit: false, roofBuilt: false,
+    basement: 0, basementUnit: false, roofBuilt: false, existingReal: 0,
     permitYear: R.yr || mb.permitYear, year: R.yr || mb.year,
     geo: R.bn && R.bn[1] ? { bn: R.bn, br: R.br, fs: R.fs } : null,
     declared: !!R.decl || !!R.u4, low: R.area === '4' && R.low ? R.low : null,
@@ -1128,64 +1130,178 @@ const QUICK_FILTERS = [
 /* =========================================================================
    5b. DEVELOPER ECONOMICS: shared parameters + per-parcel profit
    ========================================================================= */
+/* Developer parameters. Prices are per EQUIVALENT m2 incl. VAT, per unit type and rova (the father's method):
+   equivalent = net apartment area + coef × outdoor area (balcony / garden / mini-penthouse terrace / penthouse roof). */
+const ZONES = [['3', 'רובע 3'], ['4', 'רובע 4'], ['56', 'רובעים 5–6'], ['ig', 'אבן גבירול']];
+const UTYPES = [['garden', 'דירת גן'], ['typ', 'קומה טיפוסית'], ['mini', 'מיני פנטהאוז'], ['ph', 'פנטהאוז']];
+const UT_LABEL = Object.fromEntries(UTYPES);
+const zkey = z => z === '5-6' ? '56' : z;
+const PRICE_FIELDS = UTYPES.flatMap(([t]) => ZONES.map(([z]) => ({ k: `p_${t}_${z}` })));
 const DEV_GROUPS = [
-  { title: 'עלויות בנייה', fields: [
-    { k: 'costAdd', label: 'עלות בנייה בתוספת', unit: '₪ למ״ר', ph: '9,000' },
-    { k: 'costRebuild', label: 'עלות בנייה בהריסה ובנייה (כולל הריסה ומרתפים)', unit: '₪ למ״ר', ph: '11,000' },
-    { k: 'retrofit', label: 'חיזוק ושיפוץ הבניין הקיים (בתוספת): שלד, מעלית, חזיתות', unit: '₪ למ״ר קיים', ph: '3,500' },
-    { k: 'soft', label: 'עלויות רכות: תכנון, היתרים, פיקוח, משפטי', unit: '% מעלות הבנייה', ph: '12' },
-    { k: 'finance', label: 'מימון וליווי בנקאי', unit: '% מעלות הבנייה', ph: '6' }] },
+  { title: 'שטח אקוויוולנטי: כמה מכל שטח חוץ נספר', note: 'לפי השיטה המקובלת: מוסיפים לשטח הדירה חלק משטח החוץ שלה. מזינים באחוזים.', fields: [
+    { k: 'eqBalc', label: 'מרפסת, בכל הדירות', unit: '% מהמרפסת', ph: '50', h: 'כמה מטר ממרפסת נספרים כשטח דירה. מקובל 50%.' },
+    { k: 'balcMax', label: 'מרפסת לכל דירה', unit: 'מ״ר', ph: '12', h: 'שטח מרפסת ממוצע לדירה. התכנית מתירה עד 14 מ״ר לדירה ובממוצע עד 12, ולא בכל פרויקט אפשר בכל הדירות.' },
+    { k: 'eqGarden', label: 'גינה של דירת גן', unit: '% מהגינה', ph: '25', h: 'מקובל 25%–33% משטח הגינה.' },
+    { k: 'eqTerrace', label: 'מרפסת הנסיגה של מיני פנטהאוז', unit: '% מהמרפסת', ph: '50', h: 'מרפסת הגג שנוצרת מהנסיגה. מקובל 50%.' },
+    { k: 'eqRoof', label: 'גג שמוצמד לפנטהאוז', unit: '% מהגג', ph: '30', h: 'מקובל 25%–40% משטח הגג, ועם בריכה גדולה עד 50%.' },
+    { k: 'roofShare', label: 'כמה מהגג העליון מוצמד לפנטהאוז', unit: '% מהגג', ph: '35', h: 'חלק מהגג העליון תפוס במערכות (מיזוג, סולארי, חדר מדרגות). בלי ערך: 35%, הנחה של הכלי.' }] },
+  { title: 'תכנון ושטחים', fields: [
+    { k: 'netRatio', label: 'שטח דירות (נטו) מתוך השטח הבנוי (ברוטו)', unit: '%', ph: '80', h: 'כמה מכל מ״ר בנוי הוא שטח דירה שנמכר. השאר: קירות חוץ, מדרגות, מעלית, לובי.' },
+    { k: 'unitSize', label: 'גודל ממוצע לדירת יזם בקומה טיפוסית', unit: 'מ״ר', ph: '100', h: 'משמש לספירת דירות (לחישוב מרפסות וחניות).' },
+    { k: 'gardenShare', label: 'חלק מהחצר שמוצמד לדירות הגן', unit: '%', ph: '50', h: 'מהשטח הפנוי במגרש (מגרש פחות תכסית).' },
+    { k: 'parkM2', label: 'שטח מרתף לכל חניה', unit: 'מ״ר', ph: '60', h: 'כולל רמפות, מחסנים ומעברים. בפרויקטים לדוגמה: 53–72 מ״ר.' }] },
   { title: 'תמורה לבעלים', fields: [
-    { k: 'ownerSqm', label: 'תוספת מ״ר לכל דירת בעלים', unit: 'מ״ר', ph: '12' },
-    { k: 'parking', label: 'חניה לכל דירת בעלים (בהריסה ובנייה)', unit: '₪ לדירה', ph: '250,000' },
+    { k: 'ownerSqm', label: 'תוספת לכל דירת בעלים', unit: 'מ״ר', ph: '12', h: 'כמה מ״ר מקבל כל בעל דירה מעבר לשטח הקיים שלו.' },
+    { k: 'ownerBalc', label: 'מרפסת לכל דירת בעלים', unit: 'מ״ר', ph: '12', h: 'נכנס לעלות המרפסות.' },
     { k: 'rent', label: 'שכר דירה לבעלים בזמן הבנייה', unit: '₪ לחודש לדירה', ph: '9,000' },
-    { k: 'months', label: 'משך בנייה בהריסה ובנייה', unit: 'חודשים', ph: '36' }] },
-  { title: 'הכנסות ומיסוי', fields: [
-    { k: 'netRatio', label: 'שטח דירות למכירה מתוך השטח הבנוי (ברוטו)', unit: '%', ph: '78' },
-    { k: 'sale_3', label: 'מחיר מכירה לדירה חדשה · רובע 3', unit: '₪ למ״ר', ph: '' },
-    { k: 'sale_4', label: 'מחיר מכירה לדירה חדשה · רובע 4', unit: '₪ למ״ר', ph: '' },
-    { k: 'sale_56', label: 'מחיר מכירה לדירה חדשה · רובעים 5–6', unit: '₪ למ״ר', ph: '' },
-    { k: 'sale_ig', label: 'מחיר מכירה לדירה חדשה · אבן גבירול', unit: '₪ למ״ר', ph: '' },
-    { k: 'levy56', label: 'היטל השבחה ברובעים 5–6 ובאבן גבירול', unit: '% מההכנסות', ph: '5' }] },
+    { k: 'months', label: 'משך הבנייה', unit: 'חודשים', ph: '30' },
+    { k: 'moving', label: 'הובלות לכל דירה, הלוך וחזור', unit: '₪', ph: '10,000' }] },
+  { title: 'עלויות ביצוע (ללא מע״מ)', fields: [
+    { k: 'costRebuild', label: 'בנייה מעל הקרקע', unit: '₪ למ״ר ברוטו', ph: '8,000', h: 'אם יש לכם מחיר חוזה ביצוע כולל (שלד, גמר, מרתף ומרפסות), חלקו אותו בשטח הברוטו מעל הקרקע, הזינו כאן, ושימו 0 במרתף ובמרפסות.' },
+    { k: 'costBasement', label: 'מרתף חניה', unit: '₪ למ״ר', ph: '4,000' },
+    { k: 'costBalc', label: 'מרפסות', unit: '₪ למ״ר', ph: '2,500' },
+    { k: 'demolition', label: 'הריסה, כריתת עצים ובריכה', unit: '₪', ph: '750,000' },
+    { k: 'contingency', label: 'בלתי צפוי', unit: '% מהביצוע', ph: '3' },
+    { k: 'costAdd', label: 'בנייה בתוספת על בניין קיים', unit: '₪ למ״ר', ph: '9,000', h: 'רק למסלול תוספת.' },
+    { k: 'retrofit', label: 'חיזוק ושיפוץ בניין קיים (בתוספת)', unit: '₪ למ״ר קיים', ph: '3,500', h: 'רק למסלול תוספת.' }] },
+  { title: 'עלויות רכות ומיסים (ללא מע״מ)', fields: [
+    { k: 'mgmt', label: 'ניהול ופיקוח', unit: '₪', ph: '1,500,000' },
+    { k: 'architect', label: 'אדריכל', unit: '₪', ph: '600,000' },
+    { k: 'consult', label: 'יועצים, מעבדות ושמאים', unit: '₪', ph: '800,000' },
+    { k: 'fees', label: 'אגרות בנייה והיטלי פיתוח', unit: '₪', ph: '900,000' },
+    { k: 'betterment', label: 'היטל השבחה', unit: '₪', ph: '1,000,000' },
+    { k: 'lawTen', label: 'עו״ד ומפקח דיירים', unit: '₪', ph: '800,000' },
+    { k: 'lawDev', label: 'עו״ד יזם', unit: '% מהמכירות', ph: '0.8' },
+    { k: 'marketing', label: 'שיווק ופרסום', unit: '% מהמכירות', ph: '1.5' },
+    { k: 'elec', label: 'חיבורי חשמל ובזק', unit: '₪', ph: '150,000' },
+    { k: 'purchaseTax', label: 'מס רכישה', unit: '₪', ph: '1,300,000' },
+    { k: 'financing', label: 'מימון, ערבויות חוק מכר וביטוח', unit: '₪', ph: '2,500,000' },
+    { k: 'overhead', label: 'תקורה', unit: '% מסך העלויות', ph: '1' }] },
   { title: 'סף החלטה', fields: [
-    { k: 'minProfit', label: 'רווח יזמי מינימלי', unit: '% מסך העלויות', ph: '18' }] }
+    { k: 'minProfit', label: 'רווח יזמי מינימלי', unit: '% מסך העלויות', ph: '25' },
+    { k: 'equity', label: 'הון עצמי', unit: '₪', ph: '8,000,000', h: 'לחישוב תשואה על ההון העצמי. לא חובה.' }] }
 ];
-const DEV_FIELDS = DEV_GROUPS.flatMap(g => g.fields);
-const saleKey = z => 'sale_' + (z === '5-6' ? '56' : z);
+const DEV_FIELDS = [...PRICE_FIELDS, ...DEV_GROUPS.flatMap(g => g.fields)];
+const VAT = 1.18;
+const num0 = v => (v === '' || v == null || !isFinite(+v)) ? 0 : +v;
+const priceOf = (dev, t, z) => { const k = zkey(z); return num0(dev[`p_${t}_${k}`]) || (t === 'typ' ? num0(dev['sale_' + k]) : 0); };
+const COST_KEYS = ['costRebuild', 'costBasement', 'costBalc', 'demolition', 'contingency', 'mgmt', 'architect', 'consult', 'fees', 'betterment', 'lawTen', 'lawDev', 'marketing', 'elec', 'purchaseTax', 'financing', 'overhead', 'rent', 'months', 'moving'];
 
+/* Automatic unit mix for a new building (demolish & rebuild), from the rights engine. Every number is an estimate the detailed calculator can change. */
+function feasAuto(p, dev) {
+  const c = p.calc, x = p.inputs, R = c.reb;
+  if (!R || !R.available || R.delta <= 0) return null;
+  const net = num0(dev.netRatio) / 100 || 0.8, z = x.rova;
+  const plate = c.typNew, roof = (c.ex && c.ex.roofNew) || 0, n = R.n || 6, r = R.roofs || 0;
+  const unitSize = num0(dev.unitSize) || 100, balc = num0(dev.balcMax) || 12;
+  const U = Math.max(1, p.units || 1), ownersNet = c.existing + U * num0(dev.ownerSqm);
+  const units = [];
+  // ground floor: lobby and services take part of it; the rest are garden apartments
+  const groundNet = Math.round(plate * net * 0.6), garden = Math.round(Math.max(0, x.lotArea - plate) * (num0(dev.gardenShare) || 50) / 100);
+  const typNetTotal = Math.round(plate * net * Math.max(0, n - 1));
+  units.push({ type: 'garden', floor: 'קרקע', owner: false, net: groundNet, balc: 0, out: garden, n: Math.max(1, Math.round(groundNet / unitSize)) });
+  const devTyp = typNetTotal - ownersNet;
+  units.push({ type: 'typ', floor: `1–${n - 1}`, owner: true, net: Math.round(Math.min(ownersNet, typNetTotal)), balc: num0(dev.ownerBalc) || balc, out: 0, n: U, note: 'דירות הבעלים: השטח הקיים + התוספת לכל דירה' });
+  if (devTyp > 0) units.push({ type: 'typ', floor: `1–${n - 1}`, owner: false, net: Math.round(devTyp), balc, out: 0, n: Math.max(1, Math.round(devTyp / unitSize)) });
+  const share = (num0(dev.roofShare) || 35) / 100, rn = Math.round(roof * net);
+  if (r >= 1) units.push({ type: r === 2 ? 'mini' : 'ph', floor: `${n} (נסיגה)`, owner: false, net: rn, balc: 0, out: Math.max(0, Math.round(plate - roof)), roofTop: r === 1 ? Math.round(roof * share) : 0, n: Math.max(1, Math.round(rn / 140)), coef: r === 1 ? (num0(dev.eqRoof) || 0) : undefined });
+  if (r === 2) units.push({ type: 'ph', floor: `${n + 1} (גג)`, owner: false, net: rn, balc: 0, out: Math.round(roof * share), n: Math.max(1, Math.round(rn / 160)) });
+  const devUnits = units.filter(u => !u.owner).reduce((a, u) => a + u.n, 0);
+  const warn = devTyp < 0 ? `הבעלים צריכים יותר שטח (${n0(ownersNet)} מ״ר) ממה שיש בקומות הטיפוסיות (${n0(typNetTotal)} מ״ר). חלק מדירות הגן או הנסיגה יעברו לבעלים.` : null;
+  const parking = U + devUnits + (r ? 1 : 0);
+  return {
+    v: 1, auto: true, zone: z, units: units.map(u => ({ ...u, price: u.owner ? 0 : priceOf(dev, u.type, z) })),
+    gross: R.total, basement: Math.round(parking * (num0(dev.parkM2) || 60)), parking, U, ownersNet, warn,
+    costs: Object.fromEntries(COST_KEYS.map(k => [k, num0(dev[k])]))
+  };
+}
+const outCoef = (dev, t) => t === 'garden' ? num0(dev.eqGarden) : t === 'ph' ? num0(dev.eqRoof) : num0(dev.eqTerrace);
+/* Compute profit from a feasibility sheet (auto or detailed). */
+function feasCompute(F, dev) {
+  const eqB = num0(dev.eqBalc) / 100;
+  const rows = F.units.map(u => {
+    const c = (u.coef != null && u.coef !== '' ? +u.coef : outCoef(dev, u.type)) / 100;
+    // balconies: per unit × units in the row
+    const balcEq = u.owner || u.type === 'garden' ? 0 : num0(u.balc) * (u.n || 1) * eqB;
+    const eqTot = num0(u.net) + balcEq + num0(u.out) * c + (u.roofTop ? num0(u.roofTop) * num0(dev.eqRoof) / 100 : 0);
+    return { ...u, coefUsed: c * 100, eq: Math.round(eqTot), value: u.owner ? 0 : Math.round(eqTot * num0(u.price)) };
+  });
+  const revenue = rows.reduce((a, r) => a + r.value, 0), revEx = revenue / VAT;
+  const C = { ...F.costs };
+  const balcM2 = rows.reduce((a, r) => a + num0(r.balc) * (r.n || 1), 0);
+  const construction = num0(F.gross) * num0(C.costRebuild) + num0(F.basement) * num0(C.costBasement) + balcM2 * num0(C.costBalc) + num0(C.demolition);
+  const contingency = construction * num0(C.contingency) / 100;
+  const owners = num0(F.U) * (num0(C.rent) * num0(C.months) + num0(C.moving));
+  const fixed = ['mgmt', 'architect', 'consult', 'fees', 'betterment', 'lawTen', 'elec', 'purchaseTax', 'financing'].reduce((a, k) => a + num0(C[k]), 0);
+  const pctItems = revEx * (num0(C.marketing) + num0(C.lawDev)) / 100;
+  const sub = construction + contingency + owners + fixed + pctItems;
+  const overhead = sub * num0(C.overhead) / 100;
+  const cost = sub + overhead, profit = revEx - cost;
+  const zero = COST_KEYS.filter(k => !num0(C[k]) && !['contingency', 'overhead', 'lawDev', 'marketing'].includes(k));
+  return { rows, revenue, revEx, balcM2, construction, contingency, owners, fixed, pctItems, overhead, cost, profit,
+    pct: cost > 0 ? profit / cost : 0, pctSales: revEx > 0 ? profit / revEx : 0, roe: num0(dev.equity) ? profit / num0(dev.equity) : null, zero };
+}
+
+let FEAS = {};
 function econ(p, dev) {
   if (!dev) return { state: 'none' };
-  const z = p.inputs.rova, sale = +dev[saleKey(z)] || 0;
-  const need = [];
-  if (!sale) need.push(saleKey(z));
-  if (!(+dev.minProfit >= 0) || dev.minProfit === '' || dev.minProfit == null) need.push('minProfit');
-  const net = (+dev.netRatio || 0) / 100;
-  if (!net) need.push('netRatio');
-  if (need.length) return { state: 'missing', need };
-  const c = p.calc, U = Math.max(1, p.units || 1), E = c.existing, oSqm = +dev.ownerSqm || 0;
-  const scen = [];
-  for (const s0 of [c.add, c.reb]) {
-    if (!s0.available || s0.delta <= 0) continue;
-    const isAdd = s0.id === 'add', rate = +(isAdd ? dev.costAdd : dev.costRebuild) || 0;
-    if (!rate) { need.push(isAdd ? 'costAdd' : 'costRebuild'); continue; }
-    const build = isAdd ? s0.area + U * oSqm : s0.total;
-    const saleable = isAdd ? s0.area : s0.total - (E + U * oSqm);
-    if (isAdd && !(+dev.retrofit >= 0 && dev.retrofit !== '' && dev.retrofit != null)) { need.push('retrofit'); continue; }
-    const construction = build * rate + (isAdd ? E * (+dev.retrofit || 0) : 0);
-    const soft = construction * ((+dev.soft || 0) + (+dev.finance || 0)) / 100;
-    const owners = isAdd ? 0 : U * ((+dev.parking || 0) + (+dev.rent || 0) * (+dev.months || 0));
-    const revenue = saleable * net * sale;
-    const levy = (z === '5-6' || z === 'ig') ? revenue * (+dev.levy56 || 0) / 100 : 0;
-    const cost = construction + soft + owners + levy;
-    const profit = revenue - cost;
-    scen.push({ id: s0.id, label: s0.label, build, saleable, construction, soft, owners, levy, revenue, cost, profit, pct: cost > 0 ? profit / cost : 0 });
+  const z = p.inputs.rova, need = [];
+  if (!priceOf(dev, 'typ', z)) need.push(`p_typ_${zkey(z)}`);
+  if (!num0(dev.netRatio)) need.push('netRatio');
+  if (dev.minProfit === '' || dev.minProfit == null || !isFinite(+dev.minProfit)) need.push('minProfit');
+  const saved = FEAS[`${p.gush}-${p.chelka}`];
+  if (need.length && !saved) return { state: 'missing', need };
+  const min = num0(dev.minProfit) / 100, scen = [];
+  const F = saved || feasAuto(p, dev);
+  if (F) {
+    if (!saved && !num0(dev.costRebuild)) need.push('costRebuild');
+    else { const r = feasCompute(F, dev); scen.push({ id: 'rebuild', label: saved ? 'הריסה ובנייה · מחשבון מפורט' : 'הריסה ובנייה · הערכה אוטומטית', detailed: !!saved, F, ...r, saleable: r.rows.filter(x => !x.owner).reduce((a, x) => a + num0(x.net), 0) }); }
   }
-  if (need.length && !scen.length) return { state: 'missing', need: [...new Set(need)] };
-  if (!scen.length) return { state: 'nodelta' };
+  const A = p.calc.add;
+  if (A.available && A.delta > 0 && num0(dev.costAdd) && dev.retrofit !== '' && dev.retrofit != null) {
+    const net = num0(dev.netRatio) / 100, sale = priceOf(dev, 'typ', z), U = Math.max(1, p.units || 1);
+    const build = A.area + U * num0(dev.ownerSqm), construction = build * num0(dev.costAdd) + p.calc.existing * num0(dev.retrofit);
+    const revEx = A.area * net * sale / VAT, cost = construction * (1 + num0(dev.contingency) / 100), profit = revEx - cost;
+    scen.push({ id: 'add', label: 'תוספת על הבניין הקיים', revEx, revenue: revEx * VAT, cost, construction, profit, pct: cost > 0 ? profit / cost : 0, pctSales: revEx ? profit / revEx : 0 });
+  }
+  if (!scen.length) return need.length ? { state: 'missing', need } : { state: 'nodelta' };
   scen.sort((a, b) => b.profit - a.profit);
-  const best = scen[0], min = (+dev.minProfit || 0) / 100;
-  return { state: 'ok', best, scen, ok: best.pct >= min, min, sale, net, U, pend: c.pend, need: [...new Set(need)] };
+  const best = scen[0];
+  return { state: 'ok', best, scen, ok: best.pct >= min, min, U: Math.max(1, p.units || 1), pend: p.calc.pend, need, detailed: !!best.detailed };
 }
+
+/* Shared per-building docs (feasibility sheets, input overrides): db collection in the Claude view, localStorage on the public site. */
+function useSharedMap(collection, lsKey, onChange) {
+  const [st, setSt] = useState({ map: {}, src: 'loading', v: 0 });
+  const col = useRef(null);
+  const local = () => { try { return JSON.parse(localStorage.getItem(lsKey) || '{}') || {}; } catch (e) { return {}; } };
+  const apply = (map, src) => { onChange(map); PCACHE.clear(); setSt(s => ({ map, src, v: s.v + 1 })); };
+  useEffect(() => {
+    let unsub = null, dead = false;
+    apply(local(), 'local');
+    (async () => {
+      const db = window.claude && window.claude.use ? await window.claude.use('db') : null;
+      if (dead || !db) return;
+      col.current = db.collection(collection);
+      unsub = col.current.onSnapshot(snap => {
+        if (snap.metadata && snap.metadata.fromCache && snap.empty) return;
+        const map = {}; snap.docs.forEach(d => { if (d.exists) map[d.id] = d.data(); });
+        apply(map, 'db');
+      }, () => { col.current = null; });
+    })();
+    return () => { dead = true; if (unsub) unsub(); };
+  }, []);
+  const write = async (key, data) => {
+    const map = { ...st.map }; if (data) map[key] = data; else delete map[key];
+    try { localStorage.setItem(lsKey, JSON.stringify(map)); } catch (e) {}
+    apply(map, col.current ? 'db' : 'local');
+    if (col.current) { try { if (data) await col.current.doc(key).set(data); else await col.current.doc(key).delete(); return { ok: true, shared: true }; } catch (e) { return { ok: true, shared: false }; } }
+    return { ok: true, shared: false };
+  };
+  return [st, write];
+}
+let OVR = {};
+const FeasCtx = React.createContext({ write: async () => ({}) });
 
 function nadlanRef(p) {
   if (!NADLAN) return null;
@@ -1356,13 +1472,17 @@ function ProfitCell({ p, onOpenDev }) {
   return (
     <div className="whitespace-nowrap">
       <div className={`text-[13px] font-bold ${e.ok ? 'text-go-ink' : 'text-stop'}`}><Num>{ils2(b.profit)}</Num> <span className="text-2xs font-semibold"><Num>{pct(b.pct, 0)}</Num></span></div>
-      <div className="text-2xs text-ink-3">{b.id === 'add' ? 'תוספת' : 'הריסה ובנייה'} · {e.ok ? 'עובר את הסף' : `מתחת ל-${pct(e.min, 0)}`}{e.pend ? ' · תכנית טרם בתוקף' : ''}</div>
+      <div className="text-2xs text-ink-3">{b.id === 'add' ? 'תוספת' : 'הריסה ובנייה'}{b.detailed ? ' · מפורט' : ''} · {e.ok ? 'עובר את הסף' : `מתחת ל-${pct(e.min, 0)}`}{e.pend ? ' · תכנית טרם בתוקף' : ''}</div>
     </div>
   );
 }
 
 function DevParamsModal({ dev, onSave, onClose, toast }) {
-  const [vals, setVals] = useState(() => ({ ...(dev.values || {}) }));
+  const [vals, setVals] = useState(() => {
+    const v = { ...(dev.values || {}) };
+    ZONES.forEach(([z]) => { if (v[`p_typ_${z}`] == null && v['sale_' + z] != null) v[`p_typ_${z}`] = v['sale_' + z]; });
+    return v;
+  });
   const [busy, setBusy] = useState(false);
   const set = (k, v) => setVals(o => ({ ...o, [k]: v }));
   const submit = async e => {
@@ -1371,7 +1491,15 @@ function DevParamsModal({ dev, onSave, onClose, toast }) {
     const r = await onSave(clean); setBusy(false);
     toast(r.shared ? 'הפרמטרים נשמרו לשניכם' : 'הפרמטרים נשמרו בדפדפן הזה'); onClose();
   };
-  const ref = NADLAN ? ['הצפון הישן-החלק הצפ', 'הצפון החדש החלק הדר', 'לב העיר'].map(n => [n, NADLAN.neighborhoods[n]]).filter(x => x[1]) : [];
+  const Field = ({ f }) => (
+    <label htmlFor={`dev-${f.k}`} className="rounded-lg border border-line px-2.5 py-1.5 bg-white focus-within:ring-2 focus-within:ring-accent/40">
+      <span className="flex items-center gap-1 text-2xs text-ink-3">{f.label} {f.h && <Info text={f.h} />}</span>
+      <span className="flex items-baseline gap-1.5">
+        <input id={`dev-${f.k}`} inputMode="decimal" dir="ltr" value={vals[f.k] ?? ''} placeholder={f.ph ? `למשל ${f.ph}` : ''} onChange={e => set(f.k, e.target.value)} className="num w-full bg-transparent text-[14px] font-bold text-ink text-start focus:outline-none placeholder:text-ink-4 placeholder:font-normal" />
+        <span className="text-2xs text-ink-3 shrink-0">{f.unit}</span>
+      </span>
+    </label>
+  );
   return (
     <Modal title="פרמטרים יזמיים" onClose={onClose} wide footer={<>
       <span className="text-2xs text-ink-3 me-auto">{dev.src === 'db' ? `משותף לכל מי שעורך את הכלי.${dev.updatedAt ? ` עודכן ${new Date(dev.updatedAt).toLocaleDateString('he-IL')}.` : ''}` : (dev.note || 'נשמר בדפדפן בלבד.')}</span>
@@ -1379,83 +1507,140 @@ function DevParamsModal({ dev, onSave, onClose, toast }) {
       <Btn variant="primary" className="h-9 px-3" onClick={submit} disabled={busy}>{busy ? 'שומר…' : 'שמירה'}</Btn>
     </>}>
       <form onSubmit={submit} className="grid gap-4">
-        <p className="text-[12.5px] text-ink-2 leading-relaxed">מזינים פעם אחת, והערכים נשמרים עד שמשנים אותם. הרווח בכל חלקה מחושב לפי הזכויות המוקנות (במסלול הכי רווחי) ולפי הערכים כאן. שדה ריק נחשב 0. בלי מחיר מכירה, עלות בנייה, אחוז הנטו, רווח מינימלי, ובתוספת גם חיזוק ושיפוץ, אין חישוב.</p>
+        <Plain open items={[
+          ['מה מזינים כאן', 'את המספרים שלכם, פעם אחת: מחירים, עלויות ותמורה לבעלים. הכלי מחשב איתם רווח לכל בניין. אפשר לשנות כל מספר בכל זמן, ולכל פרויקט אפשר להתאים במחשבון המפורט שבכרטיס הבניין.'],
+          ['מחיר למ״ר אקוויוולנטי', 'מחיר המכירה הוא לא ממוצע אחד. לכל סוג דירה מחיר משלו: דירת גן, קומה טיפוסית, מיני פנטהאוז ופנטהאוז, וזה שונה בכל רובע. המחיר הוא למ״ר ״אקוויוולנטי״: שטח הדירה ועוד חלק משטח החוץ שלה (מרפסת, גינה, גג).'],
+          ['מה חובה', 'מחיר לקומה טיפוסית ברובע של הבניין, אחוז הנטו, עלות בנייה מעל הקרקע ורווח מינימלי. שדה ריק נחשב 0, והכרטיס יראה איזה עלויות חסרות.']
+        ]} />
+        <fieldset className="grid gap-2">
+          <legend className="eyebrow mb-1">מחיר מכירה למ״ר אקוויוולנטי, כולל מע״מ</legend>
+          <div className="overflow-x-auto"><table className="w-full text-[12px] border-separate border-spacing-1">
+            <thead><tr><th></th>{ZONES.map(([z, l]) => <th key={z} className="text-2xs font-semibold text-ink-3 text-start px-1">{l}</th>)}</tr></thead>
+            <tbody>{UTYPES.map(([t, tl]) => <tr key={t}><th className="text-2xs font-semibold text-ink-2 text-start whitespace-nowrap pe-1">{tl}</th>{ZONES.map(([z]) => {
+              const k = `p_${t}_${z}`;
+              return <td key={z}><input aria-label={`${tl} · ${z}`} inputMode="decimal" dir="ltr" value={vals[k] ?? ''} placeholder={{ garden: '55,000', typ: '62,000', mini: '75,000', ph: '90,000' }[t]} onChange={e => set(k, e.target.value)} className="num w-full min-w-[78px] h-8 px-1.5 rounded-md border border-line text-[13px] font-bold text-ink focus:outline-none focus:ring-2 focus:ring-accent/40 placeholder:text-ink-4 placeholder:font-normal" /></td>;
+            })}</tr>)}</tbody>
+          </table></div>
+        </fieldset>
         {DEV_GROUPS.map(g => (
           <fieldset key={g.title} className="grid gap-2">
             <legend className="eyebrow mb-1">{g.title}</legend>
-            <div className="grid sm:grid-cols-2 gap-2">
-              {g.fields.map(f => (
-                <label key={f.k} htmlFor={`dev-${f.k}`} className="rounded-lg border border-line px-2.5 py-1.5 bg-white focus-within:ring-2 focus-within:ring-accent/40">
-                  <span className="flex items-center gap-1 text-2xs text-ink-3">{f.label} <Info k={'dv_' + f.k} /></span>
-                  <span className="flex items-baseline gap-1.5">
-                    <input id={`dev-${f.k}`} inputMode="decimal" dir="ltr" value={vals[f.k] ?? ''} placeholder={f.ph ? `למשל ${f.ph}` : ''} onChange={e => set(f.k, e.target.value)} className="num w-full bg-transparent text-[14px] font-bold text-ink text-start focus:outline-none placeholder:text-ink-4 placeholder:font-normal" />
-                    <span className="text-2xs text-ink-3 shrink-0">{f.unit}</span>
-                  </span>
-                </label>
-              ))}
-            </div>
+            {g.note && <div className="text-2xs text-ink-3 -mt-1">{g.note}</div>}
+            <div className="grid sm:grid-cols-2 gap-2">{g.fields.map(f => <React.Fragment key={f.k}>{Field({ f })}</React.Fragment>)}</div>
           </fieldset>
         ))}
-        {ref.length > 0 && (
-          <div className="rounded-lg bg-canvas border border-line p-2.5">
-            <div className="eyebrow mb-1">ייחוס: מחיר עסקה ממוצע לדירה, שנה אחרונה (נדל״ן.gov.il, {NADLAN.version})</div>
-            <div className="grid gap-0.5 text-2xs text-ink-2">
-              {ref.map(([n, nb]) => <div key={n} className="flex justify-between gap-2"><span>{n}</span><span>3 חד׳ <Num>{nb.rooms['3'] && nb.rooms['3'].yearAvg ? ils(nb.rooms['3'].yearAvg) : '—'}</Num> · 4 חד׳ <Num>{nb.rooms['4'] && nb.rooms['4'].yearAvg ? ils(nb.rooms['4'].yearAvg) : '—'}</Num></span></div>)}
-            </div>
-            <div className="text-[10px] text-ink-4 mt-1">מחיר לדירה יד שנייה, לא למ״ר ולא לדירה חדשה. מחיר המכירה למ״ר הוא החלטה שלכם.</div>
-          </div>
-        )}
       </form>
     </Modal>
   );
 }
 
-function EconSection({ p, onOpenDev }) {
-  const e = p.econ, nr = nadlanRef(p);
-  const row = (l, v, strong, neg) => <div className={`flex justify-between gap-2 px-2.5 py-1 ${strong ? 'font-bold text-ink' : 'text-ink-2'}`}><span>{l}</span><Num className={neg ? 'text-stop' : ''}>{v}</Num></div>;
+/* Detailed per-project feasibility, laid out like the developer's own spreadsheet. Saved per building and shared. */
+function FeasModal({ p, dev, onClose, toast }) {
+  const { write } = React.useContext(FeasCtx);
+  const key = `${p.gush}-${p.chelka}`, saved = FEAS[key];
+  const auto = feasAuto(p, dev || {});
+  const [F, setF] = useState(() => JSON.parse(JSON.stringify(saved || auto || { units: [], costs: {}, gross: 0, basement: 0, U: p.units })));
+  const R = feasCompute(F, dev || {});
+  const setU = (i, k, v) => setF(f => ({ ...f, units: f.units.map((u, j) => j === i ? { ...u, [k]: v } : u) }));
+  const setC = (k, v) => setF(f => ({ ...f, costs: { ...f.costs, [k]: v } }));
+  const setTop = (k, v) => setF(f => ({ ...f, [k]: v }));
+  const In = ({ v, on, w = 'w-20', ph }) => <input inputMode="decimal" dir="ltr" value={v ?? ''} placeholder={ph} onChange={e => on(e.target.value)} className={`num ${w} h-7 px-1 rounded border border-line text-[12px] font-semibold text-ink focus:outline-none focus:ring-2 focus:ring-accent/40`} />;
+  const save = async () => { const r = await write(key, { ...F, auto: false, savedAt: new Date().toISOString().slice(0, 10) }); toast(r.shared ? 'המחשבון נשמר לשניכם' : 'המחשבון נשמר בדפדפן הזה'); onClose(); };
+  const reset = () => auto && setF(JSON.parse(JSON.stringify(auto)));
+  const del = async () => { await write(key, null); toast('המחשבון המפורט נמחק. חזרה להערכה האוטומטית.'); onClose(); };
+  const COSTL = DEV_GROUPS.flatMap(g => g.fields).filter(f => COST_KEYS.includes(f.k));
+  return (
+    <Modal title={`מחשבון כדאיות מפורט · ${p.address}`} onClose={onClose} wide footer={<>
+      <span className="text-2xs text-ink-3 me-auto">{saved ? `נשמר ${saved.savedAt || ''}` : 'עדיין לא נשמר: מוצגת הערכה אוטומטית'}</span>
+      {saved && <Btn variant="ghost" className="h-9 px-3" onClick={del}>מחיקה</Btn>}
+      {auto && <Btn variant="ghost" className="h-9 px-3" onClick={reset}>איפוס להערכה</Btn>}
+      <Btn variant="primary" className="h-9 px-3" onClick={save}>שמירה</Btn>
+    </>}>
+      <div className="grid gap-4">
+        <Plain items={[
+          ['מה זה', 'אותו חישוב כמו בגיליון אקסל של יזם: רשימת הדירות בבניין החדש, השווי של כל אחת, וכל שורות העלות. הכלי מילא הערכה אוטומטית לפי הזכויות, ואפשר לשנות כל תא לפי התכנון האמיתי.'],
+          ['איך קוראים שורה', 'שטח נטו = שטח הדירה. מרפסת = מ״ר מרפסת לכל דירה. שטח חוץ = גינה, מרפסת נסיגה או גג. אקוויוולנטי = שטח הדירה ועוד אחוז משטחי החוץ. שווי = אקוויוולנטי × מחיר למ״ר.'],
+          ['איפה הכסף', 'בבניינים כאלה רוב הרווח מגיע מהפנטהאוז ומהמיני פנטהאוז: שטח חוץ גדול ומחיר למ״ר גבוה. שווה לבדוק את השורות האלה ראשונות.']
+        ]} />
+        {F.warn && <div className="text-2xs rounded-md bg-act-soft text-act-ink px-2 py-1">{F.warn}</div>}
+        <div className="overflow-x-auto border border-line rounded-lg"><table className="w-full text-[12px] min-w-[880px]">
+          <thead className="bg-canvas text-2xs text-ink-3"><tr className="[&>th]:px-1.5 [&>th]:py-1.5 [&>th]:text-start">
+            <th>סוג</th><th>קומה</th><th>בעלים / יזם</th><th>דירות</th><th>שטח נטו (סה״כ)</th><th>מרפסת לדירה</th><th>שטח חוץ</th><th>מקדם חוץ %</th><th>אקוויוולנטי</th><th>₪ למ״ר</th><th>שווי</th><th></th></tr></thead>
+          <tbody>{R.rows.map((u, i) => (
+            <tr key={i} className={`border-t border-line-soft [&>td]:px-1.5 [&>td]:py-1 ${u.owner ? 'bg-canvas/60' : ''}`}>
+              <td><select value={u.type} onChange={e => setU(i, 'type', e.target.value)} className="h-7 rounded border border-line text-[12px] bg-white">{UTYPES.map(([t, l]) => <option key={t} value={t}>{l}</option>)}</select></td>
+              <td>{In({ v: u.floor, on: v => setU(i, 'floor', v), w: 'w-16' })}</td>
+              <td><button onClick={() => setU(i, 'owner', !u.owner)} className={`h-7 px-2 rounded text-2xs font-semibold ${u.owner ? 'bg-line-soft text-ink-2' : 'bg-accent-soft text-accent'}`}>{u.owner ? 'בעלים' : 'יזם'}</button></td>
+              <td>{In({ v: u.n, on: v => setU(i, 'n', v), w: 'w-12' })}</td>
+              <td>{In({ v: u.net, on: v => setU(i, 'net', v) })}</td>
+              <td>{In({ v: u.balc, on: v => setU(i, 'balc', v), w: 'w-14' })}</td>
+              <td>{In({ v: u.out, on: v => setU(i, 'out', v), w: 'w-16' })}</td>
+              <td>{In({ v: u.coef, on: v => setU(i, 'coef', v), w: 'w-14', ph: String(outCoef(dev || {}, u.type) || '') })}</td>
+              <td><Num className="font-bold">{n0(u.eq)}</Num></td>
+              <td>{u.owner ? <span className="text-2xs text-ink-4">—</span> : In({ v: u.price, on: v => setU(i, 'price', v), w: 'w-20' })}</td>
+              <td><Num className="font-bold">{u.owner ? '—' : ils(u.value)}</Num></td>
+              <td><button aria-label="מחיקת שורה" onClick={() => setF(f => ({ ...f, units: f.units.filter((_, j) => j !== i) }))} className="text-ink-4 hover:text-stop"><Icon name="x" className="w-3.5 h-3.5" /></button></td>
+            </tr>))}
+          </tbody></table></div>
+        <button onClick={() => setF(f => ({ ...f, units: [...f.units, { type: 'typ', floor: '', owner: false, n: 1, net: 100, balc: num0(dev && dev.balcMax) || 12, out: 0, price: priceOf(dev || {}, 'typ', p.inputs.rova) }] }))} className="justify-self-start text-[12px] font-semibold text-accent hover:underline">+ הוספת שורת דירות</button>
+        <div className="grid sm:grid-cols-3 gap-2">
+          <label className="rounded-lg border border-line p-2 text-2xs text-ink-3">שטח בנוי מעל הקרקע (ברוטו)<div className="flex items-baseline gap-1">{In({ v: F.gross, on: v => setTop('gross', v), w: 'w-full' })}<span>מ״ר</span></div></label>
+          <label className="rounded-lg border border-line p-2 text-2xs text-ink-3">שטח מרתף<div className="flex items-baseline gap-1">{In({ v: F.basement, on: v => setTop('basement', v), w: 'w-full' })}<span>מ״ר</span></div></label>
+          <label className="rounded-lg border border-line p-2 text-2xs text-ink-3">דירות בעלים (לשכירות והובלות)<div className="flex items-baseline gap-1">{In({ v: F.U, on: v => setTop('U', v), w: 'w-full' })}<span>דירות</span></div></label>
+        </div>
+        <fieldset className="grid gap-2"><legend className="eyebrow">עלויות לפרויקט הזה (ללא מע״מ)</legend>
+          <div className="grid sm:grid-cols-3 gap-2">{COSTL.map(f => (
+            <label key={f.k} className="rounded-lg border border-line px-2 py-1 text-2xs text-ink-3">{f.label}<div className="flex items-baseline gap-1">{In({ v: F.costs[f.k], on: v => setC(f.k, v), w: 'w-full', ph: f.ph })}<span className="shrink-0">{f.unit}</span></div></label>))}
+          </div></fieldset>
+        <div className="rounded-xl bg-ink text-white p-3 grid sm:grid-cols-4 gap-3">
+          {[['הכנסות (ללא מע״מ)', ils(R.revEx)], ['סך עלויות', ils(R.cost)], ['רווח', ils2(R.profit)], ['רווח מהעלות / מהמכירות', `${pct(R.pct, 1)} / ${pct(R.pctSales, 1)}`]].map(([l, v]) => (
+            <div key={l}><div className="text-2xs text-white/60">{l}</div><div className="num text-[17px] font-bold">{v}</div></div>))}
+          {R.roe != null && <div className="sm:col-span-4 text-2xs text-white/70">תשואה על ההון העצמי: <Num>{pct(R.roe, 0)}</Num></div>}
+        </div>
+        <div className="grid sm:grid-cols-2 gap-1 text-2xs text-ink-2">
+          {[['ביצוע: בנייה, מרתף, מרפסות, הריסה', R.construction], ['בלתי צפוי', R.contingency], ['שכירות והובלות לבעלים', R.owners], ['עלויות רכות, מיסים ומימון', R.fixed], ['שיווק ועו״ד יזם (% מהמכירות)', R.pctItems], ['תקורה', R.overhead]].map(([l, v]) => <div key={l} className="flex justify-between gap-2 bg-canvas rounded px-2 py-1"><span>{l}</span><Num>{ils(v)}</Num></div>)}
+        </div>
+        {R.zero.length > 0 && <div className="text-2xs rounded-md bg-act-soft text-act-ink px-2 py-1">שורות עלות שלא הוזנו ונחשבות 0: {R.zero.map(k => (COSTL.find(f => f.k === k) || {}).label).filter(Boolean).join(', ')}. הרווח גבוה מהאמיתי עד שימולאו.</div>}
+      </div>
+    </Modal>
+  );
+}
+
+function EconSection({ p, onOpenDev, onOpenFeas }) {
+  const e = p.econ, b = e && e.state === 'ok' ? e.best : null;
+  const byType = b && b.rows ? UTYPES.map(([t, l]) => { const rs = b.rows.filter(r => r.type === t && !r.owner); return [l, rs.reduce((a, r) => a + r.eq, 0), rs.reduce((a, r) => a + r.value, 0)]; }).filter(x => x[1] > 0) : [];
+  const ex = p.calc.ex || {};
   return (
     <Section info="econ" eyebrow="כלכלה יזמית" title="רווח לפי הפרמטרים שלכם" icon="scale">
-      <Plain open={!!(e && e.state === 'ok')} items={e && e.state === 'ok' ? (() => { const b = e.best; return [
-        ['כמה נמכר', `בבניין החדש יש ${n0(b.saleable)} מ״ר שהיזם מוכר (אחרי שהבעלים מקבלים את הדירות שלהם). מתוך זה ${pct(e.net, 0)} הם שטח דירות נטו, כלומר ${n0(b.saleable * e.net)} מ״ר.`],
-        ['כמה כסף נכנס', `${n0(b.saleable * e.net)} מ״ר × ${ils(e.sale)} למ״ר = ${ils(b.revenue)}.`],
-        ['כמה כסף יוצא', `בנייה ${ils(b.construction)}${b.soft ? `, הוצאות רכות ומימון ${ils(b.soft)}` : ''}${b.owners ? `, חניה ושכירות לבעלים ${ils(b.owners)}` : ''}${b.levy ? `, היטל השבחה ${ils(b.levy)}` : ''}. סה״כ ${ils(b.cost)}.`],
-        ['השורה התחתונה', `${ils(b.revenue)} פחות ${ils(b.cost)} = רווח של ${ils2(b.profit)}, שהם ${pct(b.pct, 1)} מהעלויות. הסף שקבעתם הוא ${pct(e.min, 0)}, ולכן הבניין ${e.ok ? 'עובר אותו' : 'לא עובר אותו'}.`],
-        ['מה לא נכלל', 'הקרקע לא עולה כסף, כי משלמים עליה בדירות לבעלים. לא נכללים: מס רכישה, שמאי ועורך דין, וסטיות בלוח הזמנים.']
-      ]; })() : [
-        ['מה רואים כאן', 'כמה כסף יזם ירוויח מהבניין הזה, לפי המחירים והעלויות שאתם מזינים.'],
-        ['מה חסר', 'עוד לא הוזנו פרמטרים יזמיים: עלות בנייה למ״ר, מחיר מכירה למ״ר, כמה מקבלים הבעלים, ומה הרווח המינימלי שלכם.'],
-        ['מה עושים', 'לוחצים ״הזנת פרמטרים״. מזינים פעם אחת, והכלי מחשב לכל הבניינים בבת אחת.']
+      <Plain open={!!b} items={b && b.rows ? [
+        ['איך מחושבות ההכנסות', `לכל סוג דירה מחיר משלו למ״ר ״אקוויוולנטי״: שטח הדירה ועוד חלק משטח החוץ (מרפסת, גינה, גג). היזם מוכר רק את הדירות שלא הולכות לבעלים. סה״כ ${ils(b.revenue)} כולל מע״מ, ${ils(b.revEx)} בלי מע״מ.`],
+        ['כמה מקבלים הבעלים', `${e.U} דירות בעלים: השטח הקיים (${n0(p.calc.existing)} מ״ר${ex.existingReal ? ', לפי מה שהזנתם' : ', הערכה מהמפה'}) ועוד התוספת לכל דירה. הם לא מכניסים כסף, אבל עולים בבנייה, בשכירות ובהובלות.`],
+        ['כמה כסף יוצא', `ביצוע ${ils(b.construction)}, בעלים ${ils(b.owners)}, רכות ומיסים ${ils(b.fixed)}, ועוד אחוזים. סה״כ ${ils(b.cost)}.`],
+        ['השורה התחתונה', `רווח ${ils2(b.profit)}: ${pct(b.pct, 1)} מהעלויות ו-${pct(b.pctSales, 1)} מהמכירות. הסף שלכם ${pct(e.min, 0)}, ולכן הבניין ${e.ok ? 'עובר' : 'לא עובר'}.`],
+        b.detailed ? ['מאיפה המספרים', 'מהמחשבון המפורט ששמרתם לבניין הזה.'] : ['חשוב לדעת', 'זו הערכה אוטומטית: תמהיל הדירות נבנה מהזכויות. לפרויקט אמיתי פותחים ״מחשבון מפורט״ ומתקנים לפי התכנון.']
+      ].filter(Boolean) : [
+        ['מה רואים כאן', 'כמה כסף יזם ירוויח מהבניין, לפי המחירים והעלויות שאתם מזינים, בשיטה של יזמים: מחיר לכל סוג דירה, שטח אקוויוולנטי, וכל שורות העלות.'],
+        ['מה חסר', e && e.state === 'missing' ? `חסרים: ${e.need.map(k => k.startsWith('p_') ? 'מחיר לקומה טיפוסית ברובע הזה' : (DEV_FIELDS.find(f => f.k === k) || {}).label).filter(Boolean).join(', ')}.` : 'עוד לא הוזנו פרמטרים יזמיים.'],
+        ['מה עושים', 'לוחצים ״הזנת פרמטרים״. מזינים פעם אחת, והכלי מחשב לכל הבניינים.']
       ]} />
-      {(!e || e.state === 'none' || e.state === 'missing') ? (
+      {!b ? (
         <div className="rounded-lg border border-dashed border-line p-3 text-[12.5px] text-ink-2">
-          {e && e.state === 'missing' ? `חסרים פרמטרים לחלקה הזו: ${e.need.map(k => (DEV_FIELDS.find(f => f.k === k) || {}).label).join(', ')}.` : 'עוד לא הוזנו פרמטרים יזמיים.'}
-          <div className="mt-2"><Btn variant="soft" className="h-8 px-3" onClick={onOpenDev}>הזנת פרמטרים</Btn></div>
+          {e && e.state === 'nodelta' ? 'אין תוספת זכויות, ולכן אין חישוב רווח.' : 'עוד לא הוזנו כל הפרמטרים הנדרשים.'}
+          <div className="mt-2 flex gap-2"><Btn variant="soft" className="h-8 px-3" onClick={onOpenDev}>הזנת פרמטרים</Btn>{p.calc.reb.available && <Btn variant="ghost" className="h-8 px-3" onClick={onOpenFeas}>מחשבון מפורט</Btn>}</div>
         </div>
-      ) : e.state === 'nodelta' ? <div className="text-[12.5px] text-ink-3">אין תוספת זכויות מוקנית, ולכן אין חישוב רווח.</div> : (
+      ) : (
         <div className="grid gap-2">
-          {e.scen.map((b, i) => (
-            <div key={b.id} className={`rounded-lg border text-[12px] ${i === 0 ? 'border-accent' : 'border-line'}`}>
-              <div className="flex items-center justify-between px-2.5 py-1.5 border-b border-line-soft">
-                <span className="font-bold text-ink">{b.label}{i === 0 && <span className="ms-1.5 text-2xs font-bold text-white bg-accent rounded px-1.5">הכי רווחי</span>}</span>
-                <span className={`font-bold ${b.pct >= e.min ? 'text-go-ink' : 'text-stop'}`}><Num>{pct(b.pct, 1)}</Num></span>
-              </div>
-              {row(`הכנסות (${n0(b.saleable)} מ״ר ברוטו × ${pct(e.net, 0)} נטו × ${ilsK(e.sale)})`, ils2(b.revenue))}
-              {row(b.id === 'add' ? `בנייה (${n0(b.build)} מ״ר) + חיזוק ושיפוץ (${n0(p.calc.existing)} מ״ר קיים)` : `בנייה (${n0(b.build)} מ״ר)`, '−' + ils(b.construction))}
-              {b.soft > 0 && row('רכות ומימון', '−' + ils(b.soft))}
-              {b.owners > 0 && row(`חניה ושכירות לבעלים (${e.U} דירות)`, '−' + ils(b.owners))}
-              {b.levy > 0 && row('היטל השבחה', '−' + ils(b.levy))}
-              <div className="border-t border-line-soft">{row('רווח יזמי', ils2(b.profit), true, b.profit < 0)}</div>
-            </div>
-          ))}
-          <div className="text-2xs text-ink-3 leading-snug">בעלי דירות: <Num>{e.U}</Num> ({p.ownReal ? 'תתי-חלקות רשומות' : 'הערכה'}). הקרקע לא מתומחרת, כי היא ניתנת בתמורה לדירות. {e.pend ? 'התכנית עדיין לא בתוקף, אז זה תרחיש. ' : ''}{e.need.length ? `חסר: ${e.need.map(k => (DEV_FIELDS.find(f => f.k === k) || {}).label).join(', ')}.` : ''}</div>
-          <button onClick={onOpenDev} className="text-2xs font-semibold text-accent hover:underline justify-self-start">עריכת הפרמטרים</button>
-        </div>
-      )}
-      {nr && (
-        <div className="mt-3 rounded-lg bg-canvas border border-line p-2.5 text-2xs text-ink-2">
-          <div className="font-semibold text-ink mb-0.5">ייחוס: {nr.name}{nr.exact ? '' : ' (שכונה משוערת לפי רובע)'}</div>
-          מחיר עסקה ממוצע, שנה אחרונה: 3 חד׳ <Num>{nr.rooms['3'] && nr.rooms['3'].yearAvg ? ils(nr.rooms['3'].yearAvg) : '—'}</Num> · 4 חד׳ <Num>{nr.rooms['4'] && nr.rooms['4'].yearAvg ? ils(nr.rooms['4'].yearAvg) : '—'}</Num> · כל הדירות <Num>{nr.rooms.all && nr.rooms.all.yearAvg ? ils(nr.rooms.all.yearAvg) : '—'}</Num>
-          <div className="text-[10px] text-ink-4">נדל״ן.gov.il, עדכון {nr.version}. יד שנייה, לדירה ולא למ״ר.</div>
+          <div className="grid grid-cols-3 gap-px bg-line rounded-lg overflow-hidden border border-line">
+            {[['רווח', ils2(b.profit), b.profit < 0], ['מהעלות', pct(b.pct, 1), !e.ok], ['מהמכירות', pct(b.pctSales, 1), false]].map(([l, v, bad]) => <div key={l} className="bg-white p-2"><div className="text-2xs text-ink-3">{l}</div><Num className={`text-[15px] font-bold ${bad ? 'text-stop' : 'text-go-ink'}`}>{v}</Num></div>)}
+          </div>
+          <div className="text-2xs text-ink-3">{b.label}{e.scen.length > 1 ? ` · נבדק גם: ${e.scen.slice(1).map(s => `${s.label} (${ils2(s.profit)})`).join(', ')}` : ''}</div>
+          {byType.length > 0 && <div className="rounded-lg border border-line text-[12px]">
+            <div className="px-2.5 py-1.5 border-b border-line-soft text-2xs font-bold text-ink-2">הכנסות לפי סוג דירה (דירות יזם)</div>
+            {byType.map(([l, eq, v]) => <div key={l} className="flex justify-between gap-2 px-2.5 py-1"><span>{l} · <Num>{n0(eq)}</Num> מ״ר אקוו׳</span><Num className="font-semibold">{ils(v)}</Num></div>)}
+          </div>}
+          {b.zero && b.zero.length > 0 && <div className="text-2xs rounded-md bg-act-soft text-act-ink px-2 py-1">עלויות שלא הוזנו נחשבות 0, והרווח גבוה מהאמיתי: {b.zero.map(k => (DEV_FIELDS.find(f => f.k === k) || {}).label).filter(Boolean).join(', ')}.</div>}
+          {!ex.existingReal && <div className="text-2xs rounded-md bg-canvas border border-line text-ink-2 px-2 py-1">השטח הקיים ({n0(p.calc.existing)} מ״ר) הוא הערכה מהמפה, ויכול לטעות ב-±20%. מזינים את השטח האמיתי בשדה ״שטח בנוי קיים בפועל״ במנוע הזכויות.</div>}
+          <div className="flex gap-3"><button onClick={onOpenFeas} className="text-[12px] font-bold text-accent hover:underline">{b.detailed ? 'פתיחת המחשבון המפורט' : 'מחשבון מפורט לפרויקט הזה'}</button><button onClick={onOpenDev} className="text-2xs font-semibold text-ink-3 hover:underline">עריכת הפרמטרים</button></div>
         </div>
       )}
     </Section>
@@ -2126,6 +2311,7 @@ const INPUT_DEFS = [
   { k: 'frontage', label: 'רוחב חזית', unit: 'מ׳', src: 'GIS · מדידה', type: 'num', min: 6, max: 80 },
   { k: 'floors', label: 'קומות קיימות כולל קרקע', unit: '', src: 'תיק בניין', type: 'num', min: 1, max: 12 },
   { k: 'typ', label: 'שטח קומה טיפוסית', unit: 'מ״ר', src: 'תיק בניין', type: 'num', min: 40, max: 2000 },
+  { k: 'existingReal', label: 'שטח בנוי קיים בפועל (0 = לא ידוע)', unit: 'מ״ר', src: 'חישוב אגרות · תיק בניין', type: 'num', min: 0, max: 30000 },
   { k: 'basement', label: 'שטח מרתף קיים', unit: 'מ״ר', src: 'תיק בניין', type: 'num', min: 0, max: 3000 },
   { k: 'permitYear', label: 'שנת היתר מקורי', unit: '', src: 'תיק בניין', type: 'num', min: 1900, max: 2026 },
   { k: 'pilotis', label: 'קומת עמודים פתוחה', src: 'תיק בניין · סיור', type: 'bool' },
@@ -2273,7 +2459,10 @@ function RightsExplain({ p, openRule }) {
         <div className="text-2xs text-ink-3 mb-1 flex flex-wrap gap-1 items-center">מקור כל מספר: <T t="gis" /> נתון מהמפה העירונית · <T t="plan" /> כתוב בתכנית · <T t="est" /> הנחה של הכלי · <T t="calc" /> תוצאה של חישוב</div>
         <ol>
           <Row n="1" title="מה בנוי היום">
-            תכסית <Num>{n0(x.typ)}</Num> מ״ר <T t="gis" /> × <Num>{e.resFloors}</Num> קומות מגורים <T t="gis" />{x.pilotis ? <> + קומת עמודים (15% מהתכסית) <T t="est" /></> : null}{e.roofExisting ? <> + בנייה על הגג <Num>{n0(e.roofExisting)}</Num> <T t="est" /></> : null} = <b><Num>{n0(c.existing)}</Num> מ״ר</b> <T t="calc" />
+            {e.existingReal
+              ? <>שטח שהזנתם מחישוב אגרות או מתיק הבניין: <b><Num>{n0(c.existing)}</Num> מ״ר</b>. ההערכה מהמפה הייתה <Num>{n0(e.existingEst)}</Num> מ״ר.</>
+              : <>תכסית <Num>{n0(x.typ)}</Num> מ״ר <T t="gis" /> × <Num>{e.resFloors}</Num> קומות מגורים <T t="gis" />{x.pilotis ? <> + קומת עמודים (15% מהתכסית) <T t="est" /></> : null}{e.roofExisting ? <> + בנייה על הגג <Num>{n0(e.roofExisting)}</Num> <T t="est" /></> : null} = <b><Num>{n0(c.existing)}</Num> מ״ר</b> <T t="calc" />
+                <div className="text-2xs text-ink-3 mt-1">זו הערכה: קו המבנה במפה כולל מרפסות ובליטות, ולא רואה מרתף. בבדיקה מול חישובי אגרות אמיתיים הטעות הגיעה עד 20%, לשני הכיוונים. אם יש לכם את השטח האמיתי, הזינו אותו בשדה ״שטח בנוי קיים בפועל״ למטה.</div></>}
           </Row>
           <Row n="2" title="איזו תכנית חלה, ומה היא מתירה">
             {planName} <T t="plan" />. הזכויות בתכנית הזו לא כתובות במ״ר אלא כ״מעטפת״: כמה קומות, וכמה רחוק מגבולות המגרש. את המ״ר מחשבים מזה. {c.reb.available ? <>בבנייה חדשה: <b>{c.reb.short.replace(' (הריסה)', '')}</b>.</> : null} {c.add.available ? <>בתוספת על הקיים: <b>{c.add.short}</b>.</> : null}
@@ -2751,7 +2940,7 @@ function TabuSection({ p, legalSigned }) {
   );
 }
 
-function Inspector({ onOpenDev, p, onClose, onExport, onSave, saved, onContact, overlay, onOverride, onReset, openRule }) {
+function Inspector({ onOpenFeas, onOpenDev, p, onClose, onExport, onSave, saved, onContact, overlay, onOverride, onReset, openRule }) {
   const st = STATUS[p.status];
   const legalSigned = p.unitList.filter(u => u.notes.includes('warn126')).length;
   return (
@@ -2804,7 +2993,7 @@ function Inspector({ onOpenDev, p, onClose, onExport, onSave, saved, onContact, 
 
         <RightsCalculator p={p} onOverride={onOverride} onReset={onReset} openRule={openRule} />
 
-        <EconSection p={p} onOpenDev={onOpenDev} />
+        <EconSection p={p} onOpenDev={onOpenDev} onOpenFeas={onOpenFeas} />
 
         <CtxSection p={p} />
 
@@ -2976,10 +3165,12 @@ function App() {
   const [query, setQuery] = useState('אחד העם');
   const [target, setTarget] = useState(initialTarget);
   const [scan, setScan] = useState(() => scanList(initialTarget));
-  const [overrides, setOverrides] = useState({});
+  const [ovSt, writeOv] = useSharedMap('overrides', 'israprop.ov.v1', m => { OVR = m; });
+  const [feasSt, writeFeas] = useSharedMap('feas', 'israprop.feas.v1', m => { FEAS = m; });
+  const ovOf = (sid, num) => { const R = realRec(sid, num); return R ? OVR[`${R.g}-${R.c}`] : undefined; };
   const [extra, setExtra] = useState(null);
   const [rulesFocus, setRulesFocus] = useState(null);
-  const parcels = useMemo(() => scan.map(s => genParcelC(s.streetId, s.num, s.idx, s.total, overrides[`${s.streetId}-${s.num}`])), [scan, overrides, lst.v, nv]);
+  const parcels = useMemo(() => scan.map(s => genParcelC(s.streetId, s.num, s.idx, s.total, ovOf(s.streetId, s.num))), [scan, ovSt.v, lst.v, nv, feasSt.v]);
   const [scanning, setScanning] = useState(false);
   const [scanStep, setScanStep] = useState(0);
   const [chips, setChips] = useState([]);
@@ -3017,7 +3208,7 @@ function App() {
       i += 1;
       if (i >= SCAN_STEPS.length) {
         clearInterval(timer.current);
-        const res = scanList(t).map(s => genParcelC(s.streetId, s.num, s.idx, s.total, overrides[`${s.streetId}-${s.num}`]));
+        const res = scanList(t).map(s => genParcelC(s.streetId, s.num, s.idx, s.total, ovOf(s.streetId, s.num)));
         setScan(scanList(t)); setScanning(false);
         const hc = res.filter(p => p.highConviction).length;
         toast(`הסריקה הושלמה: ${res.length} חלקות, ${hc} מועמדים`);
@@ -3040,19 +3231,20 @@ function App() {
       const c = typeof va === 'string' ? va.localeCompare(vb, 'he') : va - vb;
       return sort.dir === 'desc' ? -c : c;
     });
-  }, [chipFiltered, tab, sort, dev.values]);
+  }, [chipFiltered, tab, sort, dev.values, feasSt.v]);
   const visibleIds = useMemo(() => new Set(rows.map(r => r.id)), [rows]);
 
   const parcelsById = useMemo(() => Object.fromEntries(parcels.map(p => [p.id, p])), [parcels]);
-  const extraParcel = useMemo(() => extra ? genParcelC(extra.streetId, extra.num, extra.idx, extra.total, overrides[`${extra.streetId}-${extra.num}`]) : null, [extra, overrides, lst.v, nv]);
+  const extraParcel = useMemo(() => extra ? genParcelC(extra.streetId, extra.num, extra.idx, extra.total, ovOf(extra.streetId, extra.num)) : null, [extra, ovSt.v, lst.v, nv, feasSt.v]);
   const selected = selectedId ? (parcelsById[selectedId] || (extraParcel && extraParcel.id === selectedId ? extraParcel : null)) : null;
   if (selected && !selected.econ) selected.econ = econ(selected, dev.values);
   const selectP = p => setSelectedId(p.id);
   const onOverride = (k, v) => {
-    const id = selected.id;
-    setOverrides(o => { const cur = { ...(o[id] || {}) }; if (v === undefined) delete cur[k]; else cur[k] = v; const n = { ...o }; if (Object.keys(cur).length) n[id] = cur; else delete n[id]; return n; });
+    const key = `${selected.gush}-${selected.chelka}`, cur = { ...(OVR[key] || {}) };
+    if (v === undefined) delete cur[k]; else cur[k] = v;
+    writeOv(key, Object.keys(cur).length ? cur : null);
   };
-  const onResetOverrides = () => { const id = selected.id; setOverrides(o => { const n = { ...o }; delete n[id]; return n; }); };
+  const onResetOverrides = () => writeOv(`${selected.gush}-${selected.chelka}`, null);
   const isSaved = selected && pipeline.some(x => x.id === selected.id);
   const onSave = () => {
     if (!selected) return;
@@ -3066,13 +3258,14 @@ function App() {
 
   const inspector = selected && (
     <Inspector onOpenDev={() => setDevOpen(true)} p={selected} overlay={!isXL} saved={isSaved} onClose={() => setSelectedId(null)}
-      onOverride={onOverride} onReset={onResetOverrides} openRule={id => setRulesFocus(id)}
+      onOpenFeas={() => setModal('feas')} onOverride={onOverride} onReset={onResetOverrides} openRule={id => setRulesFocus(id)}
       onExport={() => setModal('teaser')} onSave={onSave} onContact={() => setModal('contact')} />
   );
 
   return (
     <ListingCtx.Provider value={{ st: lst, write: writeListing }}>
     <NesachCtx.Provider value={{ save: saveNesach, remove: removeNesach }}>
+    <FeasCtx.Provider value={{ write: writeFeas }}>
     <div className="app flex flex-col">
       <Header onOpenAbout={() => setAboutOpen(true)} onOpenDev={() => setDevOpen(true)} devMissing={dev.src !== 'loading' && !dev.values} onOpenRules={() => setRulesFocus('all')} query={query} setQuery={setQuery} onScan={onScan} scanning={scanning} scanStep={scanStep} scanTarget={target}
         chips={chips} toggleChip={toggleChip} pipeline={pipeline} onOpenParcel={openFromPipeline} parcelsById={parcelsById}
@@ -3107,6 +3300,7 @@ function App() {
       {aboutOpen && <AboutModal onClose={closeAbout} onOpenDev={() => setDevOpen(true)} />}
       {devOpen && <DevParamsModal dev={dev} onSave={saveDev} onClose={() => setDevOpen(false)} toast={toast} />}
       {rulesFocus !== null && <RulesModal focusId={rulesFocus} onClose={() => setRulesFocus(null)} />}
+      {modal === 'feas' && selected && <FeasModal p={selected} dev={dev.values} onClose={() => setModal(null)} toast={toast} />}
       {modal === 'order' && <OrderListModal rows={rows} onClose={() => setModal(null)} toast={toast} />}
       {modal === 'teaser' && selected && <TeaserModal p={selected} onClose={() => setModal(null)} toast={toast} />}
       {modal === 'contact' && selected && <ContactModal p={selected} onClose={() => setModal(null)} toast={toast} />}
@@ -3115,6 +3309,7 @@ function App() {
         {toasts.map(t => <div key={t.id} className="anim-fade bg-ink text-white text-[12.5px] font-semibold px-3.5 py-2 rounded-lg shadow-pop flex items-center gap-2"><Icon name="check" className="w-4 h-4 text-go" stroke={2.4} />{t.msg}</div>)}
       </div>
     </div>
+    </FeasCtx.Provider>
     </NesachCtx.Provider>
     </ListingCtx.Provider>
   );
